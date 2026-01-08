@@ -453,3 +453,80 @@ input[type="checkbox"]:disabled {
 }
 
 .text-center { text-align: center !important; }
+
+/* Stats Cards Dashboard */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.stat-card {
+    background: white;
+    padding: 20px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    border: 1px solid rgba(0,0,0,0.03);
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.stat-info span { font-size: 0.8rem; color: var(--gray-color); }
+.stat-info h3 { font-size: 1.1rem; font-weight: 700; margin: 0; }
+
+.total .stat-icon { background: rgba(67, 97, 238, 0.1); color: var(--primary-color); }
+.income .stat-icon { background: rgba(6, 255, 165, 0.1); color: #00b894; }
+.expense .stat-icon { background: rgba(255, 0, 110, 0.1); color: var(--danger-color); }
+
+/* Accordion Style */
+.month-accordion {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    box-shadow: var(--box-shadow);
+}
+
+.accordion-header {
+    padding: 15px 20px;
+    background: #fff;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    border-bottom: 1px solid #f1f1f1;
+}
+
+.accordion-content {
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.month-accordion.active .accordion-content {
+    max-height: 2000px; /* Nilai tinggi maksimal */
+    padding: 15px;
+}
+
+.badge {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+.badge-in { background: #e6fff6; color: #00b894; }
+.badge-out { background: #fff0f5; color: #ff006e; }
