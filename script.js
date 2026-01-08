@@ -135,70 +135,93 @@ function loadUangKas() {
 }
 
 function renderUangKas(data) {
-    kasContainer.innerHTML = '';
-    if (data.length <= 1) return;
+    const container = document.getElementById('kasContainer');
+    container.innerHTML = '';
+    
+    if (!data || data.length <= 1) {
+        container.innerHTML = '<p class="text-center">Data kas tidak ditemukan.</p>';
+        return;
+    }
 
-    const months = {};
     let grandTotalSaldo = 0;
     let currentMonthIn = 0;
     let currentMonthOut = 0;
-    const currentMonthName = moment().format('MMMM'); // Misal: January
+    
+    // Mendapatkan nama bulan saat ini dalam Bahasa Inggris & Indonesia untuk pengecekan ganda
+    const monthEN = moment().format('MMMM').toLowerCase(); // "january"
+    const monthID = moment().locale('id').format('MMMM').toLowerCase(); // "januari"
 
-    // Parsing data
+    const monthsGroup = {};
+
     for (let i = 1; i < data.length; i++) {
-        const [id, bulan, tgl, ket, masuk, keluar] = data[i];
-        const valMasuk = parseInt(masuk) || 0;
-        const valKeluar = parseInt(keluar) || 0;
-        
-        grandTotalSaldo += (valMasuk - valKeluar);
+        const row = data[i];
+        if (row.length < 5) continue;
 
-        // Hitung total khusus bulan berjalan
-        if (bulan.toLowerCase().includes(currentMonthName.toLowerCase())) {
-            currentMonthIn += valMasuk;
-            currentMonthOut += valKeluar;
+        const bulanSheet = (row[1] || "").toString().toLowerCase(); // Ambil kolom Bulan dari Sheets
+        
+        // Bersihkan angka dari simbol Rp, titik, atau koma agar bisa dihitung
+        const masuk = parseInt(row[4].toString().replace(/[^0-9]/g, "")) || 0;
+        const keluar = parseInt(row[5].toString().replace(/[^0-9]/g, "")) || 0;
+
+        grandTotalSaldo += (masuk - keluar);
+
+        // LOGIKA PERBAIKAN: Cek apakah nama bulan di Sheets mengandung nama bulan saat ini
+        // Contoh: Jika di Sheets "Januari 2026" dan bulan ini "januari", maka COCOK.
+        if (bulanSheet.includes(monthEN) || bulanSheet.includes(monthID)) {
+            currentMonthIn += masuk;
+            currentMonthOut += keluar;
         }
 
-        if (!months[bulan]) months[bulan] = [];
-        months[bulan].push({ tgl, ket, masuk: valMasuk, keluar: valKeluar });
+        if (!monthsGroup[row[1]]) monthsGroup[row[1]] = [];
+        monthsGroup[row[1]].push({
+            tgl: row[2],
+            ket: row[3],
+            masuk: masuk,
+            keluar: keluar
+        });
     }
 
-    // Update Stats Cards
-    document.getElementById('statTotalSaldo').textContent = `Rp ${formatNumber(grandTotalSaldo)}`;
-    document.getElementById('statTotalMasuk').textContent = `Rp ${formatNumber(currentMonthIn)}`;
-    document.getElementById('statTotalKeluar').textContent = `Rp ${formatNumber(currentMonthOut)}`;
+    // Update Angka di Kartu Dashboard dengan Animasi Counter Sederhana
+    document.getElementById('statTotalSaldo').innerText = `Rp ${formatNumber(grandTotalSaldo)}`;
+    document.getElementById('statTotalMasuk').innerText = `Rp ${formatNumber(currentMonthIn)}`;
+    document.getElementById('statTotalKeluar').innerText = `Rp ${formatNumber(currentMonthOut)}`;
 
-    // Render Accordion per Bulan
-    Object.keys(months).reverse().forEach((m, idx) => {
-        const monthDiv = document.createElement('div');
-        monthDiv.className = `month-accordion ${idx === 0 ? 'active' : ''}`; // Buka bulan terbaru
+    // Render List Accordion (Urutan Terbaru di Atas)
+    Object.keys(monthsGroup).reverse().forEach((m, idx) => {
+        const accDiv = document.createElement('div');
+        accDiv.className = `month-accordion ${idx === 0 ? 'active' : ''}`;
         
-        let runningBal = 0;
-        let tableRows = months[m].map(t => {
-            runningBal += (t.masuk - t.keluar);
+        let subBalance = 0;
+        let rowsHtml = monthsGroup[m].map(item => {
+            subBalance += (item.masuk - item.keluar);
             return `
                 <tr>
-                    <td>${moment(t.tgl).format('DD/MM')}</td>
-                    <td>${t.ket}</td>
-                    <td><span class="badge ${t.masuk > 0 ? 'badge-in' : ''}">${t.masuk > 0 ? '+' + formatNumber(t.masuk) : '-'}</span></td>
-                    <td><span class="badge ${t.keluar > 0 ? 'badge-out' : ''}">${t.keluar > 0 ? '-' + formatNumber(t.keluar) : '-'}</span></td>
-                    <td class="text-right"><strong>${formatNumber(runningBal)}</strong></td>
-                </tr>`;
+                    <td>${item.tgl}</td>
+                    <td>${item.ket}</td>
+                    <td><span class="badge ${item.masuk > 0 ? 'badge-in' : ''}">${item.masuk > 0 ? '+' + formatNumber(item.masuk) : '-'}</span></td>
+                    <td><span class="badge ${item.keluar > 0 ? 'badge-out' : ''}">${item.keluar > 0 ? '-' + formatNumber(item.keluar) : '-'}</span></td>
+                    <td class="text-right"><strong>${formatNumber(subBalance)}</strong></td>
+                </tr>
+            `;
         }).join('');
 
-        monthDiv.innerHTML = `
+        accDiv.innerHTML = `
             <div class="accordion-header" onclick="this.parentElement.classList.toggle('active')">
-                <span><i class="fas fa-calendar-alt"></i> ${m}</span>
+                <span><i class="fas fa-calendar-check"></i> ${m}</span>
                 <i class="fas fa-chevron-down"></i>
             </div>
             <div class="accordion-content">
                 <div class="table-container">
                     <table class="data-table">
-                        <thead><tr><th>Tgl</th><th>Keterangan</th><th>Masuk</th><th>Keluar</th><th>Saldo</th></tr></thead>
-                        <tbody>${tableRows}</tbody>
+                        <thead>
+                            <tr><th>Tgl</th><th>Keterangan</th><th>Masuk</th><th>Keluar</th><th>Saldo</th></tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
                     </table>
                 </div>
-            </div>`;
-        kasContainer.appendChild(monthDiv);
+            </div>
+        `;
+        container.appendChild(accDiv);
     });
 }
 
