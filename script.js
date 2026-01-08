@@ -24,6 +24,7 @@ const rondaTable = document.getElementById('rondaTable');
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
+    console.log("Aplikasi dimulai.");
     // Event listeners
     refreshBtn.addEventListener('click', refreshAllData);
     
@@ -31,6 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
     navItems.forEach(item => {
         item.addEventListener('click', function() {
             const pageName = this.getAttribute('data-page');
+            console.log(`Pindah ke halaman: ${pageName}`);
             switchPage(pageName);
         });
     });
@@ -68,18 +70,21 @@ function switchPage(pageName) {
 
 // Load initial data
 function loadInitialData() {
+    console.log("Memuat data awal...");
     refreshAllData();
 }
 
 // Refresh all data
 function refreshAllData() {
     const currentPage = document.querySelector('.page.active').id.replace('Page', '');
+    console.log(`Menyegarkan data untuk halaman: ${currentPage}`);
     loadPageData(currentPage);
 }
 
 // Load page data
 function loadPageData(pageName) {
     showLoading(true);
+    console.log(`Memuat data untuk: ${pageName}`);
     
     switch (pageName) {
         case 'pengumuman':
@@ -99,14 +104,21 @@ function loadPageData(pageName) {
 
 // Function to fetch and parse CSV
 function fetchAndParseCSV(url) {
+    console.log(`Mencoba mengambil CSV dari: ${url}`);
     return new Promise((resolve, reject) => {
         Papa.parse(url, {
             download: true,
             header: false,
             complete: function(results) {
-                resolve(results.data);
+                console.log('CSV berhasil diambil dan di-parse. Data:', results.data);
+                if (results.data && results.data.length > 0) {
+                    resolve(results.data);
+                } else {
+                    reject(new Error("Data CSV kosong atau tidak valid."));
+                }
             },
             error: function(error) {
+                console.error('Gagal mengambil atau mem-parse CSV:', error);
                 reject(error);
             }
         });
@@ -124,17 +136,21 @@ function showLoading(show) {
 
 // Update last update time
 function updateLastUpdateTime() {
-    lastUpdate.textContent = `Terakhir diperbarui: ${moment().format('DD MMMM YYYY, HH:mm:ss')}`;
+    const now = moment().format('DD MMMM YYYY, HH:mm:ss');
+    lastUpdate.textContent = `Terakhir diperbarui: ${now}`;
+    console.log(`Waktu update: ${now}`);
 }
 
 // Pengumuman functions
 function loadPengumuman() {
     fetchAndParseCSV(csvUrls.pengumuman)
         .then(data => {
+            console.log("Data Pengumuman diterima, mulai merender...");
             renderPengumuman(data);
             updateLastUpdateTime();
         })
         .catch(error => {
+            console.error("Error di loadPengumuman:", error);
             showToast('Gagal memuat data pengumuman: ' + error.message, 'error');
         })
         .finally(() => {
@@ -143,10 +159,18 @@ function loadPengumuman() {
 }
 
 function renderPengumuman(data) {
+    console.log("Merender Pengumuman dengan data:", data);
     pengumumanList.innerHTML = '';
+    
+    if (data.length <= 1) {
+        pengumumanList.innerHTML = '<p>Belum ada pengumuman.</p>';
+        return;
+    }
     
     // Skip header row (index 0)
     for (let i = 1; i < data.length; i++) {
+        if (data[i].length < 5) continue; // Skip baris yang tidak lengkap
+        
         const [id, tanggal, judul, isi, pengirim] = data[i];
         
         const card = document.createElement('div');
@@ -154,14 +178,14 @@ function renderPengumuman(data) {
         
         card.innerHTML = `
             <div class="card-header">
-                <h3 class="card-title">${judul}</h3>
+                <h3 class="card-title">${judul || 'Tanpa Judul'}</h3>
                 <span class="card-date">${moment(tanggal).format('DD MMMM YYYY')}</span>
             </div>
             <div class="card-content">
-                <p>${isi}</p>
+                <p>${isi || '-'}</p>
             </div>
             <div class="card-footer">
-                <span>Oleh: ${pengirim}</span>
+                <span>Oleh: ${pengirim || '-'}</span>
             </div>
         `;
         
@@ -173,10 +197,12 @@ function renderPengumuman(data) {
 function loadIuranBulanan() {
     fetchAndParseCSV(csvUrls.iuran)
         .then(data => {
+            console.log("Data Iuran diterima, mulai merender...");
             renderIuranBulanan(data);
             updateLastUpdateTime();
         })
         .catch(error => {
+            console.error("Error di loadIuranBulanan:", error);
             showToast('Gagal memuat data iuran bulanan: ' + error.message, 'error');
         })
         .finally(() => {
@@ -185,6 +211,7 @@ function loadIuranBulanan() {
 }
 
 function renderIuranBulanan(data) {
+    console.log("Merender Iuran dengan data:", data);
     if (data.length === 0) {
         iuranTable.innerHTML = '<tr><td colspan="100%">Tidak ada data</td></tr>';
         return;
@@ -202,14 +229,15 @@ function renderIuranBulanan(data) {
     
     // Add table rows
     for (let i = 1; i < data.length; i++) {
+        if (data[i].length === 0) continue;
         html += '<tr>';
         
         // Add name
-        html += `<td>${data[i][0]}</td>`;
+        html += `<td>${data[i][0] || '-'}</td>`;
         
         // Add month checkboxes
         for (let j = 1; j < data[i].length; j++) {
-            const checked = data[i][j] === 'TRUE' ? 'checked' : '';
+            const checked = data[i][j] && data[i][j].toString().toUpperCase() === 'TRUE' ? 'checked' : '';
             
             html += `
                 <td class="checkbox-container">
@@ -230,10 +258,12 @@ function renderIuranBulanan(data) {
 function loadUangKas() {
     fetchAndParseCSV(csvUrls.kas)
         .then(data => {
+            console.log("Data Kas diterima, mulai merender...");
             renderUangKas(data);
             updateLastUpdateTime();
         })
         .catch(error => {
+            console.error("Error di loadUangKas:", error);
             showToast('Gagal memuat data uang kas: ' + error.message, 'error');
         })
         .finally(() => {
@@ -242,10 +272,11 @@ function loadUangKas() {
 }
 
 function renderUangKas(data) {
+    console.log("Merender Kas dengan data:", data);
     kasContainer.innerHTML = '';
     
-    if (data.length === 0) {
-        kasContainer.innerHTML = '<p>Tidak ada data</p>';
+    if (data.length <= 1) {
+        kasContainer.innerHTML = '<p>Belum ada transaksi kas.</p>';
         return;
     }
     
@@ -254,6 +285,8 @@ function renderUangKas(data) {
     
     // Skip header row (index 0)
     for (let i = 1; i < data.length; i++) {
+        if (data[i].length < 6) continue; // Skip baris yang tidak lengkap
+        
         const [id, bulan, tanggal, keterangan, pemasukan, pengeluaran] = data[i];
         
         if (!transactionsByMonth[bulan]) {
@@ -363,10 +396,12 @@ function renderUangKas(data) {
 function loadJadwalRonda() {
     fetchAndParseCSV(csvUrls.ronda)
         .then(data => {
+            console.log("Data Ronda diterima, mulai merender...");
             renderJadwalRonda(data);
             updateLastUpdateTime();
         })
         .catch(error => {
+            console.error("Error di loadJadwalRonda:", error);
             showToast('Gagal memuat data jadwal ronda: ' + error.message, 'error');
         })
         .finally(() => {
@@ -375,6 +410,7 @@ function loadJadwalRonda() {
 }
 
 function renderJadwalRonda(data) {
+    console.log("Merender Ronda dengan data:", data);
     if (data.length === 0) {
         rondaTable.innerHTML = '<tr><td colspan="100%">Tidak ada data</td></tr>';
         return;
@@ -392,14 +428,15 @@ function renderJadwalRonda(data) {
     
     // Add table rows
     for (let i = 1; i < data.length; i++) {
+        if (data[i].length === 0) continue;
         html += '<tr>';
         
         // Add name
-        html += `<td>${data[i][0]}</td>`;
+        html += `<td>${data[i][0] || '-'}</td>`;
         
         // Add date checkboxes
         for (let j = 1; j < data[i].length - 2; j++) {
-            const checked = data[i][j] === 'TRUE' ? 'checked' : '';
+            const checked = data[i][j] && data[i][j].toString().toUpperCase() === 'TRUE' ? 'checked' : '';
             
             html += `
                 <td class="checkbox-container">
@@ -433,24 +470,23 @@ function formatNumber(num) {
 
 // Show toast notification
 function showToast(message, type = 'info') {
-    // Create toast element
+    console.log(`Toast: ${message} (${type})`);
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.textContent = message;
     
-    // Add to DOM
     document.body.appendChild(toast);
     
-    // Show toast
     setTimeout(() => {
         toast.classList.add('show');
     }, 10);
     
-    // Hide and remove after 3 seconds
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => {
-            document.body.removeChild(toast);
+            if (document.body.contains(toast)) {
+                document.body.removeChild(toast);
+            }
         }, 300);
     }, 3000);
 }
