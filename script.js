@@ -1,166 +1,81 @@
-/*******************************
- * KONFIGURASI
- *******************************/
-const API_URL =
-  "https://script.google.com/macros/s/AKfycbzO55YCPFDNd9WQPykDCt3NqL4gPjLsZJ-kk1crNiHmWOKxQCKaUa_VLKBmvUrtx8L6/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzO55YCPFDNd9WQPykDCt3NqL4gPjLsZJ-kk1crNiHmWOKxQCKaUa_VLKBmvUrtx8L6/exec";
 
-let currentRole = "guest";
+// ================= UI ELEMENT =================
+const loginDiv = document.getElementById("login");
+const appDiv = document.getElementById("app");
+const roleText = document.getElementById("role");
+const content = document.getElementById("content");
 
-/*******************************
- * ELEMENT DOM
- *******************************/
-const loginScreen = document.getElementById("loginScreen");
-const mainScreen = document.getElementById("mainScreen");
-const adminLoginForm = document.getElementById("adminLoginForm");
-const userRoleText = document.getElementById("userRole");
+// ================= GUEST LOGIN =================
+function loginGuest() {
+  console.log("LOGIN GUEST");
+  roleText.innerText = "Guest";
+  loginDiv.classList.add("hidden");
+  appDiv.classList.remove("hidden");
+  loadPage("pengumuman");
+}
 
-const guestBtn = document.getElementById("guestBtn");
-const adminLoginBtn = document.getElementById("adminLoginBtn");
-const loginBtn = document.getElementById("loginBtn");
-const cancelLoginBtn = document.getElementById("cancelLoginBtn");
-const logoutBtn = document.getElementById("logoutBtn");
+// ================= ADMIN LOGIN =================
+async function loginAdmin() {
+  const pass = document.getElementById("adminPass").value;
 
-const passwordInput = document.getElementById("password");
-
-/*******************************
- * LOGIN LOGIC
- *******************************/
-guestBtn.onclick = () => {
-  currentRole = "guest";
-  enterApp();
-};
-
-adminLoginBtn.onclick = () => {
-  adminLoginForm.classList.remove("hidden");
-};
-
-cancelLoginBtn.onclick = () => {
-  adminLoginForm.classList.add("hidden");
-  passwordInput.value = "";
-};
-
-loginBtn.onclick = async () => {
-  const password = passwordInput.value.trim();
-  if (!password) {
-    alert("Password tidak boleh kosong");
+  if (!pass) {
+    alert("Masukkan password admin");
     return;
   }
 
-  await loginAdmin(password);
-};
-
-logoutBtn.onclick = () => {
-  location.reload();
-};
-
-/*******************************
- * LOGIN ADMIN (CORS SAFE)
- *******************************/
-async function loginAdmin(password) {
   try {
-    const url =
-      API_URL +
-      "?action=login&password=" +
-      encodeURIComponent(password);
-
-    const res = await fetch(url);
+    const res = await fetch(`${API_URL}?action=validateLogin&password=${pass}`);
     const data = await res.json();
 
-    if (data.success) {
-      currentRole = "admin";
-      enterApp();
+    if (data.valid) {
+      roleText.innerText = "Admin";
+      loginDiv.classList.add("hidden");
+      appDiv.classList.remove("hidden");
+      loadPage("pengumuman");
     } else {
-      alert("Password admin salah");
+      alert("Password salah");
     }
   } catch (err) {
-    console.error(err);
     alert("Gagal koneksi ke server");
+    console.error(err);
   }
 }
 
-/*******************************
- * MASUK APLIKASI
- *******************************/
-function enterApp() {
-  loginScreen.classList.add("hidden");
-  mainScreen.classList.remove("hidden");
-
-  userRoleText.textContent =
-    currentRole === "admin" ? "Admin" : "Guest";
-
-  document
-    .querySelectorAll(".admin-only")
-    .forEach((el) => {
-      if (currentRole === "admin") {
-        el.classList.remove("hidden");
-      } else {
-        el.classList.add("hidden");
-      }
-    });
-
-  initNavigation();
+// ================= LOGOUT =================
+function logout() {
+  appDiv.classList.add("hidden");
+  loginDiv.classList.remove("hidden");
+  content.innerHTML = "";
+  document.getElementById("adminPass").value = "";
 }
 
-/*******************************
- * NAVIGASI MENU
- *******************************/
-function initNavigation() {
-  const navItems = document.querySelectorAll(".nav-item");
-  const pages = document.querySelectorAll(".page");
+// ================= PAGE LOADER =================
+async function loadPage(page) {
+  content.innerHTML = "<p>Loading...</p>";
 
-  navItems.forEach((btn) => {
-    btn.onclick = () => {
-      navItems.forEach((b) => b.classList.remove("active"));
-      pages.forEach((p) => p.classList.remove("active"));
-
-      btn.classList.add("active");
-      document
-        .getElementById(btn.dataset.page + "Page")
-        .classList.add("active");
-    };
-  });
-
-  // load awal
-  loadPengumuman();
-}
-
-/*******************************
- * FETCH DATA (GET ONLY)
- *******************************/
-async function loadPengumuman() {
   try {
-    const res = await fetch(API_URL + "?action=pengumuman");
+    let action = "";
+    if (page === "pengumuman") action = "getPengumuman";
+    if (page === "iuran") action = "getIuranBulanan";
+    if (page === "kas") action = "getUangKas";
+    if (page === "ronda") action = "getJadwalRonda";
+
+    const res = await fetch(`${API_URL}?action=${action}`);
     const data = await res.json();
 
-    const container = document.getElementById("pengumumanList");
-    container.innerHTML = "";
-
-    data.forEach((item) => {
-      const div = document.createElement("div");
-      div.className = "card";
-      div.innerHTML = `
-        <h3>${item.judul}</h3>
-        <p>${item.isi}</p>
-        <small>${item.tanggal}</small>
-      `;
-      container.appendChild(div);
-    });
+    content.innerHTML = `
+      <h3>${page.toUpperCase()}</h3>
+      <pre>${JSON.stringify(data.data, null, 2)}</pre>
+    `;
   } catch (err) {
+    content.innerHTML = "<p>Gagal memuat data</p>";
     console.error(err);
   }
 }
 
-/*******************************
- * PLACEHOLDER MODULE
- *******************************/
-function loadIuran() {
-  console.log("Load iuran");
-}
-
-function loadKas() {
-  console.log("Load kas");
-}
-
-function loadRonda() {
-  console.log("Load ronda");
-}
+// ================= API TEST =================
+fetch(API_URL)
+  .then(res => res.json())
+  .then(data => console.log("API OK:", data))
+  .catch(err => console.error("API ERROR:", err));
