@@ -102,26 +102,36 @@ function loadPageData(pageName) {
     }
 }
 
+// *** FUNGSI YANG DIPERBAIKI ***
 // Function to fetch and parse CSV
 function fetchAndParseCSV(url) {
     console.log(`Mencoba mengambil CSV dari: ${url}`);
     return new Promise((resolve, reject) => {
-        Papa.parse(url, {
-            download: true,
-            header: false,
-            complete: function(results) {
-                console.log('CSV berhasil diambil dan di-parse. Data:', results.data);
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Gagal mengambil file. Status: ${response.status}`);
+                }
+                return response.text(); // Ambil sebagai teks terlebih dahulu
+            })
+            .then(csvText => {
+                console.log('CSV berhasil diambil sebagai teks. Panjang teks:', csvText.length);
+                // Parse teks CSV menggunakan PapaParse
+                const results = Papa.parse(csvText, {
+                    header: false,
+                    skipEmptyLines: true // Lewati baris kosong
+                });
+                console.log('CSV berhasil di-parse. Data:', results.data);
                 if (results.data && results.data.length > 0) {
                     resolve(results.data);
                 } else {
                     reject(new Error("Data CSV kosong atau tidak valid."));
                 }
-            },
-            error: function(error) {
+            })
+            .catch(error => {
                 console.error('Gagal mengambil atau mem-parse CSV:', error);
                 reject(error);
-            }
-        });
+            });
     });
 }
 
