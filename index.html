@@ -16,7 +16,7 @@
                 <div class="header-content">
                     <h1><i class="fas fa-home"></i> E-MURAI</h1>
                     <div class="refresh-info">
-                        <span id="lastUpdate">Terakhir diperbarui: -</span>
+                        <span id="lastUpdate">Last update: -</span>
                         <button id="refreshBtn" class="btn btn-small">
                             <i class="fas fa-sync-alt"></i> Refresh
                         </button>
@@ -67,14 +67,50 @@
                 </div>
 
                 <!-- Uang Kas Page -->
-                <div id="kasPage" class="page">
-                    <div class="page-header">
-                        <h2>Uang Kas</h2>
-                    </div>
-                    <div id="kasContainer">
-                        <!-- Kas tables will be loaded here -->
-                    </div>
-                </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+
+<div id="kasPage" class="page">
+    <div class="page-header">
+        <h2>Dashboard Keuangan</h2>
+        <div class="btn-group">
+            <button onclick="exportToExcel()" class="btn btn-outline btn-small">
+                <i class="fas fa-file-excel"></i> Excel
+            </button>
+            <button onclick="exportToPDF()" class="btn btn-danger btn-small">
+                <i class="fas fa-file-pdf"></i> PDF
+            </button>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card total">
+            <div class="stat-icon"><i class="fas fa-wallet"></i></div>
+            <div class="stat-info">
+                <span>Total Saldo</span>
+                <h3 id="statTotalSaldo">Rp 0</h3>
+            </div>
+        </div>
+        <div class="stat-card income">
+            <div class="stat-icon"><i class="fas fa-arrow-down"></i></div>
+            <div class="stat-info">
+                <span>Masuk (Bulan Ini)</span>
+                <h3 id="statTotalMasuk">Rp 0</h3>
+            </div>
+        </div>
+        <div class="stat-card expense">
+            <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
+            <div class="stat-info">
+                <span>Keluar (Bulan Ini)</span>
+                <h3 id="statTotalKeluar">Rp 0</h3>
+            </div>
+        </div>
+    </div>
+
+    <div id="kasContainer">
+        </div>
+</div>
 
                 <!-- Jadwal Ronda Page -->
                 <div id="rondaPage" class="page">
