@@ -2,6 +2,24 @@ const API_URL = "https://script.google.com/macros/s/AKfycbywrFbC5j8WDXlAiQ-N1ztr
 
 let role = "guest";
 
+/* ================= INIT ================= */
+
+window.onload = () => {
+  testAPI();
+};
+
+function testAPI() {
+  fetch(API_URL + "?action=ping")
+    .then(res => res.json())
+    .then(res => {
+      console.log("API OK:", res);
+    })
+    .catch(err => {
+      alert("API TIDAK TERHUBUNG");
+      console.error(err);
+    });
+}
+
 /* ================= LOGIN ================= */
 
 function loginGuest() {
@@ -26,8 +44,12 @@ function loginAdmin() {
       role = "admin";
       startApp();
     } else {
-      alert("Password salah");
+      alert("Password admin salah");
     }
+  })
+  .catch(err => {
+    alert("Login gagal");
+    console.error(err);
   });
 }
 
@@ -42,7 +64,7 @@ function logout() {
   location.reload();
 }
 
-/* ================= PAGE ================= */
+/* ================= NAV ================= */
 
 function loadPage(page) {
   if (page === "pengumuman") loadPengumuman();
@@ -58,10 +80,25 @@ function loadPengumuman() {
     .then(res => res.json())
     .then(res => {
       let html = "<h3>Pengumuman</h3>";
-      res.data.slice(1).forEach(r => {
-        html += `<p><b>${r[2]}</b><br>${r[3]}</p>`;
-      });
+
+      if (!res.data || res.data.length <= 1) {
+        html += "<p>Tidak ada pengumuman</p>";
+      } else {
+        res.data.slice(1).forEach(r => {
+          html += `
+            <div>
+              <b>${r[2]}</b><br>
+              ${r[3]}
+              <hr>
+            </div>`;
+        });
+      }
+
       document.getElementById("content").innerHTML = html;
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById("content").innerHTML = "Gagal load pengumuman";
     });
 }
 
@@ -69,12 +106,7 @@ function loadIuran() {
   fetch(API_URL + "?action=getIuran")
     .then(res => res.json())
     .then(res => {
-      let html = "<h3>Iuran Bulanan</h3><table border=1>";
-      res.data.forEach(r => {
-        html += "<tr>" + r.map(c => `<td>${c}</td>`).join("") + "</tr>";
-      });
-      html += "</table>";
-      document.getElementById("content").innerHTML = html;
+      renderTable("Iuran Bulanan", res.data);
     });
 }
 
@@ -82,12 +114,7 @@ function loadKas() {
   fetch(API_URL + "?action=getKas")
     .then(res => res.json())
     .then(res => {
-      let html = "<h3>Uang Kas</h3><table border=1>";
-      res.data.forEach(r => {
-        html += "<tr>" + r.map(c => `<td>${c}</td>`).join("") + "</tr>";
-      });
-      html += "</table>";
-      document.getElementById("content").innerHTML = html;
+      renderTable("Uang Kas", res.data);
     });
 }
 
@@ -95,11 +122,28 @@ function loadRonda() {
   fetch(API_URL + "?action=getRonda")
     .then(res => res.json())
     .then(res => {
-      let html = "<h3>Jadwal Ronda</h3><table border=1>";
-      res.data.forEach(r => {
-        html += "<tr>" + r.map(c => `<td>${c}</td>`).join("") + "</tr>";
-      });
-      html += "</table>";
-      document.getElementById("content").innerHTML = html;
+      renderTable("Jadwal Ronda", res.data);
     });
+}
+
+/* ================= UTIL ================= */
+
+function renderTable(title, data) {
+  let html = `<h3>${title}</h3>`;
+
+  if (!data || data.length === 0) {
+    html += "<p>Data kosong</p>";
+  } else {
+    html += "<table border='1'>";
+    data.forEach(row => {
+      html += "<tr>";
+      row.forEach(col => {
+        html += `<td>${col}</td>`;
+      });
+      html += "</tr>";
+    });
+    html += "</table>";
+  }
+
+  document.getElementById("content").innerHTML = html;
 }
