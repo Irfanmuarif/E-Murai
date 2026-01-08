@@ -1,6 +1,6 @@
 // Global variables
 let isAdmin = false;
-let scriptUrl = 'https://script.google.com/macros/s/AKfycbyamytGZ4HZXJFOfQ9r1pTrWGDLJL8yBbVQvpy72Dl0qkHNi_zPxF3R6ULhQel7hgTU/exec'; // Will be set after deployment
+let scriptUrl = 'https://script.google.com/macros/s/AKfycbzfn-C4coYvIoG-IEECqA-bTSOKhuLaiDUAtjnkIlg5yOZuvI1RgcmtznvvXv-5tGFT/exec'; // Will be set after deployment
 
 // DOM elements
 const loginScreen = document.getElementById('loginScreen');
@@ -192,31 +192,63 @@ function loadPageData(pageName) {
 
 // API call function
 function callApi(action, params = {}) {
-    return new Promise((resolve, reject) => {
-        const url = `${scriptUrl}?action=${action}`;
-        const formData = new FormData();
-        
-        // Add all params to formData
-        Object.keys(params).forEach(key => {
-            formData.append(key, params[key]);
-        });
-        
-        fetch(url, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                resolve(data);
-            } else {
-                reject(new Error(data.message || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            reject(error);
-        });
+  return new Promise((resolve, reject) => {
+    // Create URL with action parameter
+    const url = `${scriptUrl}?action=${action}`;
+    
+    // Create form data
+    const formData = new FormData();
+    
+    // Add all params to formData
+    Object.keys(params).forEach(key => {
+      formData.append(key, params[key]);
     });
+    
+    // Make fetch request with no-cors mode and appropriate headers
+    fetch(url, {
+      method: 'POST',
+      body: formData,
+      mode: 'no-cors' // This is important for Google Apps Script
+    })
+    .then(response => {
+      // With no-cors mode, we can't directly access the response
+      // So we'll make another request to get the data
+      return fetch(`${scriptUrl}?action=${action}&${new URLSearchParams(params)}`, {
+        method: 'GET',
+        mode: 'cors'
+      });
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === 'success') {
+        resolve(data);
+      } else {
+        reject(new Error(data.message || 'Unknown error'));
+      }
+    })
+    .catch(error => {
+      // Try alternative method if the first one fails
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(params),
+        mode: 'cors'
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'success') {
+          resolve(data);
+        } else {
+          reject(new Error(data.message || 'Unknown error'));
+        }
+      })
+      .catch(err => {
+        reject(err);
+      });
+    });
+  });
 }
 
 // Show/hide loading
