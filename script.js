@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbw5rpeX7QxQ2r3_FVUN5D8gTrcK_be4hwEc_D-_jnfb5XTqfVDwEKYPB7VbBn-XTned/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbywrFbC5j8WDXlAiQ-N1ztrCgBF4hZnlItFpcP6p77DZLiEI1YvVXb0_wW26L3mHJ4V/exec";
 
 let role = "guest";
 
