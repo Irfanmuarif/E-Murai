@@ -582,61 +582,78 @@ input[type="checkbox"]:disabled {
     transform: rotate(180deg);
 }
 
-/* Tampilan Baru Jadwal Ronda */
+/* Tampilan Baru Jadwal Ronda - Versi Perbaikan */
 .ronda-visual-container {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    padding: 10px 0;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 15px !important;
+    padding: 10px 5px !important;
+    width: 100% !important;
+    min-width: 0 !important; /* Menimpa min-width 1000px dari .data-table jika ada */
 }
 
 .ronda-item {
     background: white;
     padding: 15px;
     border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid #eee;
 }
 
 .ronda-info {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 8px;
-    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.ronda-name {
+    font-weight: 700;
+    color: var(--dark-color);
+    font-size: 1rem;
+}
+
+.ronda-days {
+    font-size: 0.85rem;
+    color: var(--gray-color);
 }
 
 .ronda-bar-bg {
     width: 100%;
-    height: 25px;
-    background: #eef2f7;
-    border-radius: 50px;
-    overflow: hidden;
+    height: 30px;
+    background: #f0f2f5;
+    border-radius: 8px;
     position: relative;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
 }
 
 .ronda-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-    transition: width 1s ease-in-out;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    background: linear-gradient(90deg, #4361ee, #3f37c9);
+    transition: width 0.8s ease-in-out;
 }
 
 .ronda-bar-text {
     position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
-    text-align: center;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 0.75rem;
-    font-weight: 500;
-    line-height: 25px;
-    color: var(--dark-color);
+    font-weight: 600;
+    color: #444; /* Warna teks saat bar kosong/pendek */
+    z-index: 2;
     pointer-events: none;
 }
 
-/* Warna khusus jika sedang ronda (0 hari) */
+/* Kondisi Khusus: Sedang Ronda */
 .status-ronda .ronda-bar-fill {
-    background: linear-gradient(90deg, #00b894, #00cec9);
+    background: linear-gradient(90deg, #00b894, #00cec9) !important;
 }
+
 .status-ronda .ronda-bar-text {
-    color: white;
+    color: white !important;
 }
