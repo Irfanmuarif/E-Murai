@@ -618,3 +618,31 @@ input[type="checkbox"]:disabled {
         margin: 0;
     }
 }
+
+/* RESPONSIVE TABLE KHUSUS HP */
+@media screen and (max-width: 600px) {
+    /* Perkecil bungkus tabelnya */
+    .table-container {
+        padding: 2px !important;
+        margin: 0 !important;
+        width: 100% !important;
+    }
+
+    /* Paksa tabel mengecil */
+    table.data-table, #iuranTable, #rondaTable {
+        font-size: 9px !important; /* Ukuran teks sangat kecil untuk HP */
+        width: 100% !important;
+        table-layout: auto !important; /* Biar kolom menyesuaikan isi */
+    }
+
+    /* Perkecil ruang di dalam kotak tabel */
+    table.data-table th, 
+    table.data-table td {
+        padding: 5px 2px !important; /* Jarak antar teks dipersempit */
+        letter-spacing: -0.5px; /* Merapatkan jarak antar huruf */
+    }
+
+    /* Sembunyikan kolom yang kurang penting jika masih penuh (Opsional) */
+    /* Contoh: Jika ingin sembunyikan kolom nomor, gunakan kode di bawah */
+    /* .data-table td:nth-child(1), .data-table th:nth-child(1) { display: none; } */
+}
