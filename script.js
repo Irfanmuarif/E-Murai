@@ -6,9 +6,8 @@ const csvUrls = {
     ronda: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRhtHQT_YmSq-tiQt-6Kqj5Ms9oeUdTdiNIChEdQPgEQryYxTMf2M5RTgpVa1oi30rvvXrJK3XY4nyd/pub?gid=2068778061&single=true&output=csv'
 };
 
-// Variabel Penampung Data Global
+// Variabel Penampung Data Kas untuk Export
 let rawKasData = []; 
-let rawRondaData = [];
 
 // DOM elements
 const refreshBtn = document.getElementById('refreshBtn');
@@ -21,6 +20,7 @@ const pages = document.querySelectorAll('.page');
 const pengumumanList = document.getElementById('pengumumanList');
 const iuranTable = document.getElementById('iuranTable');
 const kasContainer = document.getElementById('kasContainer');
+const rondaTable = document.getElementById('rondaTable');
 
 document.addEventListener('DOMContentLoaded', () => {
     refreshBtn.addEventListener('click', refreshAllData);
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
         item.addEventListener('click', () => switchPage(item.getAttribute('data-page')));
     });
     loadInitialData();
-    setInterval(refreshAllData, 5 * 60 * 1000); // Auto refresh tiap 5 menit
+    setInterval(refreshAllData, 5 * 60 * 1000);
 });
 
 function switchPage(pageName) {
@@ -60,6 +60,7 @@ function loadPageData(pageName) {
 }
 
 function fetchAndParseCSV(url) {
+    // Menambahkan timestamp agar selalu mengambil data terbaru dari Google Sheets
     const buster = `${url}&t=${new Date().getTime()}`;
     return new Promise((resolve, reject) => {
         fetch(buster)
@@ -77,16 +78,14 @@ function showLoading(show) {
 }
 
 function updateLastUpdateTime() {
-    if (lastUpdate) lastUpdate.textContent = `Update: ${moment().format('HH:mm')}`;
+    if (lastUpdate) lastUpdate.textContent = `Terakhir diperbarui: ${moment().format('DD MMMM YYYY, HH:mm:ss')}`;
 }
 
 function formatNumber(n) { 
     return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); 
 }
 
-// ---------------------------------------------------------
 // 1. PENGUMUMAN
-// ---------------------------------------------------------
 function loadPengumuman() {
     fetchAndParseCSV(csvUrls.pengumuman)
         .then(data => {
@@ -107,9 +106,7 @@ function loadPengumuman() {
         .finally(() => showLoading(false));
 }
 
-// ---------------------------------------------------------
 // 2. IURAN BULANAN
-// ---------------------------------------------------------
 function loadIuranBulanan() {
     fetchAndParseCSV(csvUrls.iuran)
         .then(data => {
@@ -123,7 +120,7 @@ function loadIuranBulanan() {
                 for (let j = 0; j < headers.length; j++) {
                     const val = (data[i][j] || "").toString().trim().toUpperCase();
                     if (val === 'TRUE' || val === 'FALSE') {
-                        html += `<td class="text-center"><div class="checkbox-container"><input type="checkbox" ${val === 'TRUE' ? 'checked' : ''} disabled></div></td>`;
+                        html += `<td class="text-center"><input type="checkbox" ${val === 'TRUE' ? 'checked' : ''} disabled></td>`;
                     } else {
                         html += `<td>${data[i][j] || '-'}</td>`;
                     }
@@ -136,13 +133,11 @@ function loadIuranBulanan() {
         .finally(() => showLoading(false));
 }
 
-// ---------------------------------------------------------
-// 3. UANG KAS (DASHBOARD & LAPORAN)
-// ---------------------------------------------------------
+// 3. UANG KAS
 function loadUangKas() {
     fetchAndParseCSV(csvUrls.kas)
         .then(data => {
-            rawKasData = data; 
+            rawKasData = data; // Penting: Simpan ke variabel global agar tidak error saat export
             renderUangKas(data);
             updateLastUpdateTime();
         })
@@ -167,8 +162,10 @@ function renderUangKas(data) {
     for (let i = 1; i < data.length; i++) {
         const row = data[i];
         if (!row[1]) continue;
+
         const masuk = parseInt(row[4]?.toString().replace(/[^0-9]/g, "")) || 0;
         const keluar = parseInt(row[5]?.toString().replace(/[^0-9]/g, "")) || 0;
+
         grandTotalSaldo += (masuk - keluar);
 
         if (row[1] === namaBulanTerkini) {
@@ -184,6 +181,10 @@ function renderUangKas(data) {
     document.getElementById('statTotalMasuk').innerText = `Rp ${formatNumber(currentMonthIn)}`;
     document.getElementById('statTotalKeluar').innerText = `Rp ${formatNumber(currentMonthOut)}`;
     
+    const textLabels = document.querySelectorAll('.stat-info span');
+    if(textLabels[1]) textLabels[1].innerText = `Masuk (${namaBulanTerkini})`;
+    if(textLabels[2]) textLabels[2].innerText = `Keluar (${namaBulanTerkini})`;
+
     Object.keys(monthsGroup).reverse().forEach((m, idx) => {
         const accDiv = document.createElement('div');
         accDiv.className = `month-accordion ${idx === 0 ? 'active' : ''}`;
@@ -222,12 +223,58 @@ function renderUangKas(data) {
     });
 }
 
+// FUNGSI EXPORT EXCEL
 function exportToExcel() {
     if (rawKasData.length === 0) return alert("Tunggu data kas dimuat!");
     const ws = XLSX.utils.aoa_to_sheet(rawKasData);
     const wb = XLSX.utils.book_new();
-    XLSUtils.book_append_sheet(wb, ws, "Laporan Kas");
-    XLSX.writeFile(wb, `Kas_EMURAI_${moment().format('YYYYMMDD')}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Laporan Kas");
+    XLSX.writeFile(wb, `Laporan_Kas_EMURAI_${moment().format('YYYYMMDD')}.xlsx`);
+}
+
+// FUNGSI EXPORT PDF DENGAN GRAFIK
+async function getChartImage() {
+    return new Promise((resolve) => {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 800; canvas.height = 400;
+            canvas.style.display = 'none';
+            document.body.appendChild(canvas);
+            const ctx = canvas.getContext('2d');
+
+            const monthsGroup = {};
+            rawKasData.slice(1).forEach(row => {
+                if (!row[1]) return;
+                if (!monthsGroup[row[1]]) monthsGroup[row[1]] = { in: 0, out: 0 };
+                monthsGroup[row[1]].in += parseInt(row[4]?.toString().replace(/[^0-9]/g, "")) || 0;
+                monthsGroup[row[1]].out += parseInt(row[5]?.toString().replace(/[^0-9]/g, "")) || 0;
+            });
+
+            const labels = Object.keys(monthsGroup);
+            const dataIn = labels.map(l => monthsGroup[l].in);
+            const dataOut = labels.map(l => monthsGroup[l].out);
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Masuk', data: dataIn, borderColor: '#4361ee', backgroundColor: '#4361ee', tension: 0.3 },
+                        { label: 'Keluar', data: dataOut, borderColor: '#ff006e', backgroundColor: '#ff006e', tension: 0.3 }
+                    ]
+                },
+                options: {
+                    animation: {
+                        onComplete: function() {
+                            const imgData = canvas.toDataURL('image/png');
+                            document.body.removeChild(canvas);
+                            resolve(imgData);
+                        }
+                    }
+                }
+            });
+        } catch (e) { resolve(null); }
+    });
 }
 
 async function exportToPDF() {
@@ -236,9 +283,19 @@ async function exportToPDF() {
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
-        doc.setFontSize(18);
-        doc.text("LAPORAN KAS E-MURAI", 14, 20);
         
+        doc.setFontSize(18);
+        doc.text("LAPORAN BULANAN KAS E-MURAI", 14, 20);
+        doc.setFontSize(10);
+        doc.text(`Dicetak: ${moment().format('DD/MM/YYYY HH:mm')}`, 14, 27);
+        
+        const chartBase64 = await getChartImage();
+        if (chartBase64) {
+            doc.addImage(chartBase64, 'PNG', 14, 35, 180, 70);
+            doc.text("Grafik Arus Kas (Pemasukan vs Pengeluaran)", 14, 110);
+        }
+
+        let currentY = chartBase64 ? 120 : 40;
         let globalBalance = 0;
         const grouped = {};
         for (let i = 1; i < rawKasData.length; i++) {
@@ -247,89 +304,91 @@ async function exportToPDF() {
             grouped[bulan].push(rawKasData[i]);
         }
 
-        let currentY = 30;
         for (const bulan of Object.keys(grouped)) {
+            const saldoAwal = globalBalance;
+            let mIn = 0, mOut = 0;
+            if (currentY > 250) { doc.addPage(); currentY = 20; }
+            
+            doc.setFontSize(11); doc.setFont(undefined, 'bold');
+            doc.text(`BULAN: ${bulan.toUpperCase()}`, 14, currentY);
+            doc.setFontSize(9);
+            doc.text(`Saldo Sebelumnya: Rp ${formatNumber(saldoAwal)}`, 196, currentY, { align: 'right' });
+            
             const rows = grouped[bulan].map(r => {
                 const vIn = parseInt(r[4]?.toString().replace(/[^0-9]/g, "")) || 0;
                 const vOut = parseInt(r[5]?.toString().replace(/[^0-9]/g, "")) || 0;
-                globalBalance += (vIn - vOut);
+                mIn += vIn; mOut += vOut; globalBalance += (vIn - vOut);
                 return [r[2], r[3], formatNumber(vIn), formatNumber(vOut), formatNumber(globalBalance)];
             });
 
-            doc.text(`Bulan: ${bulan}`, 14, currentY);
+            rows.push([
+                { content: 'TOTAL '+bulan, colSpan: 2, styles: { fillColor: [245, 245, 245], fontStyle: 'bold' } },
+                { content: formatNumber(mIn), styles: { fillColor: [245, 245, 245], fontStyle: 'bold' } },
+                { content: formatNumber(mOut), styles: { fillColor: [245, 245, 245], fontStyle: 'bold' } },
+                { content: 'Saldo Akhir: ' + formatNumber(globalBalance), styles: { fillColor: [230, 240, 255], fontStyle: 'bold' } }
+            ]);
+
             doc.autoTable({
                 startY: currentY + 5,
                 head: [['Tgl', 'Keterangan', 'Masuk', 'Keluar', 'Saldo']],
                 body: rows,
                 theme: 'grid',
                 headStyles: { fillColor: [67, 97, 238] },
+                margin: { left: 14, right: 14 },
                 didDrawPage: (d) => { currentY = d.cursor.y + 15; }
             });
         }
-        doc.save(`Laporan_Kas_EMurai.pdf`);
-    } catch (err) { alert("Gagal PDF: " + err.message); }
+        doc.save(`Laporan_Kas_EMurai_${moment().format('MMM_YYYY')}.pdf`);
+    } catch (err) { alert("Gagal membuat PDF: " + err.message); }
     finally { showLoading(false); }
 }
 
-// ---------------------------------------------------------
-// 4. JADWAL RONDA (SISTEM BAR VISUAL & SORTING)
-// ---------------------------------------------------------
+// 4. JADWAL RONDA
 function loadJadwalRonda() {
     fetchAndParseCSV(csvUrls.ronda)
         .then(data => {
             if (data.length <= 1) return;
-            rawRondaData = data;
 
             const rondaPage = document.getElementById('rondaPage');
+            // Bersihkan container dan siapkan div baru (bukan table)
             const tableContainer = rondaPage.querySelector('.table-container');
-            tableContainer.style.overflowX = "hidden";
             tableContainer.innerHTML = '<div id="rondaVisualList" class="ronda-visual-container"></div>';
             const listContainer = document.getElementById('rondaVisualList');
 
             const headers = data[0];
-            const lastRondaIdx = headers.length - 1;
+            const lastRondaIdx = headers.length - 1; // Kolom "Terakhir Ronda"
 
-              // Mapping & Sorting
-            let rondaList = [];
+            // 1. Cari nilai maksimal untuk skala bar
+            let maxHari = 0;
             for (let i = 1; i < data.length; i++) {
-                // Pastikan kolom terakhir diambil sebagai angka murni
-                const nilaiHari = parseInt(data[i][lastRondaIdx]) || 0;
-                rondaList.push({
-                    nama: data[i][0],
-                    hariTerakhir: nilaiHari
-                });
+                const nilai = parseInt(data[i][lastRondaIdx]) || 0;
+                if (nilai > maxHari) maxHari = nilai;
             }
-            
-            // Logika Sorting yang Lebih Kuat:
-            rondaList.sort((a, b) => {
-                // 1. Cek jika salah satu sedang ronda (nilai 0)
-                if (a.hariTerakhir === 0 && b.hariTerakhir !== 0) return -1; 
-                if (a.hariTerakhir !== 0 && b.hariTerakhir === 0) return 1;
+
+            // 2. Render tiap nama
+            for (let i = 1; i < data.length; i++) {
+                const nama = data[i][0];
+                const hariTerakhir = parseInt(data[i][lastRondaIdx]) || 0;
                 
-                // 2. Jika keduanya bukan 0, urutkan dari yang TERBESAR ke terkecil
-                return b.hariTerakhir - a.hariTerakhir;
-            });
-
-            const maxHari = Math.max(...rondaList.map(item => item.hariTerakhir));
-
-            rondaList.forEach(item => {
                 let persentase, labelTeks, statusClass;
 
-                if (item.hariTerakhir === 0) {
+                if (hariTerakhir === 0) {
                     persentase = 100;
                     labelTeks = "SEDANG RONDA";
                     statusClass = "status-ronda";
                 } else {
-                    persentase = maxHari > 0 ? (item.hariTerakhir / maxHari) * 100 : 0;
-                    labelTeks = `Sudah ${item.hariTerakhir} hari tidak ronda`;
+                    // Semakin kecil angka hari, semakin kosong bar-nya (0% adalah angka max)
+                    // Rumus: (hari / max) * 100
+                    persentase = (hariTerakhir / maxHari) * 100;
+                    labelTeks = `Sudah ${hariTerakhir} hari tidak ronda`;
                     statusClass = "";
                 }
 
                 const itemHtml = `
                     <div class="ronda-item ${statusClass}">
                         <div class="ronda-info">
-                            <span class="ronda-name">${item.nama}</span>
-                            <span class="ronda-days">${item.hariTerakhir === 0 ? 'Aktif Malam Ini' : item.hariTerakhir + ' Hari'}</span>
+                            <span>${nama}</span>
+                            <span>${hariTerakhir === 0 ? 'Aktif' : hariTerakhir + ' Hari'}</span>
                         </div>
                         <div class="ronda-bar-bg">
                             <div class="ronda-bar-fill" style="width: ${persentase}%"></div>
@@ -337,40 +396,9 @@ function loadJadwalRonda() {
                         </div>
                     </div>
                 `;
-                listContainer.insertAdjacentHTML('beforeend', itemHtml);
-            });
+                listContainer.innerHTML += itemHtml;
+            }
             updateLastUpdateTime();
         })
         .finally(() => showLoading(false));
-}
-
-async function exportRondaPDF() {
-    if (rawRondaData.length <= 1) return alert("Data ronda belum dimuat!");
-    showLoading(true);
-    try {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'mm', 'a4');
-        doc.setFontSize(16);
-        doc.text("HISTORI JADWAL RONDA WARGA", 14, 20);
-        
-        const rows = rawRondaData.slice(1).map(row => {
-            return row.map(cell => {
-                if (cell.toUpperCase() === 'TRUE') return 'V';
-                if (cell.toUpperCase() === 'FALSE') return '-';
-                return cell;
-            });
-        });
-
-        doc.autoTable({
-            startY: 30,
-            head: [rawRondaData[0]],
-            body: rows,
-            theme: 'grid',
-            headStyles: { fillColor: [67, 97, 238], fontSize: 8 },
-            styles: { fontSize: 7 }
-        });
-
-        doc.save(`Histori_Ronda_EMurai.pdf`);
-    } catch (err) { alert("Error: " + err.message); }
-    finally { showLoading(false); }
 }
