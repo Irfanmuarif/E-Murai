@@ -6,6 +6,9 @@ const csvUrls = {
     ronda: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRhtHQT_YmSq-tiQt-6Kqj5Ms9oeUdTdiNIChEdQPgEQryYxTMf2M5RTgpVa1oi30rvvXrJK3XY4nyd/pub?gid=2068778061&single=true&output=csv'
 };
 
+// Variabel Penampung Data Kas untuk Export
+let rawKasData = []; 
+
 // DOM elements
 const refreshBtn = document.getElementById('refreshBtn');
 const lastUpdate = document.getElementById('lastUpdate');
@@ -39,8 +42,11 @@ function loadInitialData() {
 }
 
 function refreshAllData() {
-    const activePage = document.querySelector('.page.active').id.replace('Page', '');
-    loadPageData(activePage);
+    const activePageElement = document.querySelector('.page.active');
+    if (activePageElement) {
+        const activePage = activePageElement.id.replace('Page', '');
+        loadPageData(activePage);
+    }
 }
 
 function loadPageData(pageName) {
@@ -54,8 +60,10 @@ function loadPageData(pageName) {
 }
 
 function fetchAndParseCSV(url) {
+    // Menambahkan timestamp agar selalu mengambil data terbaru dari Google Sheets
+    const buster = `${url}&t=${new Date().getTime()}`;
     return new Promise((resolve, reject) => {
-        fetch(url)
+        fetch(buster)
             .then(res => res.text())
             .then(csvText => {
                 const results = Papa.parse(csvText, { header: false, skipEmptyLines: true });
@@ -66,11 +74,15 @@ function fetchAndParseCSV(url) {
 }
 
 function showLoading(show) {
-    loadingIndicator.classList.toggle('hidden', !show);
+    if (loadingIndicator) loadingIndicator.classList.toggle('hidden', !show);
 }
 
 function updateLastUpdateTime() {
-    lastUpdate.textContent = `Terakhir diperbarui: ${moment().format('DD MMMM YYYY, HH:mm:ss')}`;
+    if (lastUpdate) lastUpdate.textContent = `Terakhir diperbarui: ${moment().format('DD MMMM YYYY, HH:mm:ss')}`;
+}
+
+function formatNumber(n) { 
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); 
 }
 
 // 1. PENGUMUMAN
@@ -94,7 +106,7 @@ function loadPengumuman() {
         .finally(() => showLoading(false));
 }
 
-// 2. IURAN BULANAN (FIXED: Sesuai Header)
+// 2. IURAN BULANAN
 function loadIuranBulanan() {
     fetchAndParseCSV(csvUrls.iuran)
         .then(data => {
@@ -122,12 +134,10 @@ function loadIuranBulanan() {
 }
 
 // 3. UANG KAS
-let allKasData = []; // Variabel global untuk menampung data kas buat export
-
 function loadUangKas() {
     fetchAndParseCSV(csvUrls.kas)
         .then(data => {
-            allKasData = data;
+            rawKasData = data; // Penting: Simpan ke variabel global agar tidak error saat export
             renderUangKas(data);
             updateLastUpdateTime();
         })
@@ -135,11 +145,9 @@ function loadUangKas() {
 }
 
 function renderUangKas(data) {
-    const container = document.getElementById('kasContainer');
-    container.innerHTML = '';
-    
+    kasContainer.innerHTML = '';
     if (!data || data.length <= 1) {
-        container.innerHTML = '<p class="text-center">Data kas tidak ditemukan.</p>';
+        kasContainer.innerHTML = '<p class="text-center">Data kas tidak ditemukan.</p>';
         return;
     }
 
@@ -149,16 +157,14 @@ function renderUangKas(data) {
     
     const barisTerakhir = data[data.length - 1];
     const namaBulanTerkini = barisTerakhir[1]; 
-
     const monthsGroup = {};
 
-    // 1. Hitung Semua Data
     for (let i = 1; i < data.length; i++) {
         const row = data[i];
         if (!row[1]) continue;
 
-        const masuk = parseInt(row[4].toString().replace(/[^0-9]/g, "")) || 0;
-        const keluar = parseInt(row[5].toString().replace(/[^0-9]/g, "")) || 0;
+        const masuk = parseInt(row[4]?.toString().replace(/[^0-9]/g, "")) || 0;
+        const keluar = parseInt(row[5]?.toString().replace(/[^0-9]/g, "")) || 0;
 
         grandTotalSaldo += (masuk - keluar);
 
@@ -168,15 +174,9 @@ function renderUangKas(data) {
         }
 
         if (!monthsGroup[row[1]]) monthsGroup[row[1]] = [];
-        monthsGroup[row[1]].push({
-            tgl: row[2],
-            ket: row[3],
-            masuk: masuk,
-            keluar: keluar
-        });
+        monthsGroup[row[1]].push({ tgl: row[2], ket: row[3], masuk, keluar });
     }
 
-    // Update Dashboard Atas
     document.getElementById('statTotalSaldo').innerText = `Rp ${formatNumber(grandTotalSaldo)}`;
     document.getElementById('statTotalMasuk').innerText = `Rp ${formatNumber(currentMonthIn)}`;
     document.getElementById('statTotalKeluar').innerText = `Rp ${formatNumber(currentMonthOut)}`;
@@ -185,17 +185,13 @@ function renderUangKas(data) {
     if(textLabels[1]) textLabels[1].innerText = `Masuk (${namaBulanTerkini})`;
     if(textLabels[2]) textLabels[2].innerText = `Keluar (${namaBulanTerkini})`;
 
-    // 2. Render List Accordion dengan Saldo Per Bulan
     Object.keys(monthsGroup).reverse().forEach((m, idx) => {
         const accDiv = document.createElement('div');
         accDiv.className = `month-accordion ${idx === 0 ? 'active' : ''}`;
         
         let subBalance = 0;
-        let runningTotalMonth = 0; // Untuk menghitung saldo akhir khusus bulan ini
-
         let rowsHtml = monthsGroup[m].map(item => {
-            runningTotalMonth += (item.masuk - item.keluar);
-            subBalance = runningTotalMonth; 
+            subBalance += (item.masuk - item.keluar);
             return `
                 <tr>
                     <td>${item.tgl}</td>
@@ -203,17 +199,12 @@ function renderUangKas(data) {
                     <td><span class="badge ${item.masuk > 0 ? 'badge-in' : ''}">${item.masuk > 0 ? '+' + formatNumber(item.masuk) : '-'}</span></td>
                     <td><span class="badge ${item.keluar > 0 ? 'badge-out' : ''}">${item.keluar > 0 ? '-' + formatNumber(item.keluar) : '-'}</span></td>
                     <td class="text-right"><strong>${formatNumber(subBalance)}</strong></td>
-                </tr>
-            `;
+                </tr>`;
         }).join('');
 
-        // Tampilan Header: Kiri (Nama Bulan), Kanan (Saldo Akhir Bulan Ini)
         accDiv.innerHTML = `
             <div class="accordion-header" onclick="this.parentElement.classList.toggle('active')">
-                <div class="acc-left">
-                    <i class="fas fa-calendar-check"></i> 
-                    <span>${m}</span>
-                </div>
+                <div class="acc-left"><i class="fas fa-calendar-check"></i> <span>${m}</span></div>
                 <div class="acc-right">
                     <span class="label-saldo-header">Saldo Akhir:</span>
                     <span class="value-saldo-header">Rp ${formatNumber(subBalance)}</span>
@@ -223,56 +214,47 @@ function renderUangKas(data) {
             <div class="accordion-content">
                 <div class="table-container">
                     <table class="data-table">
-                        <thead>
-                            <tr><th>Tgl</th><th>Keterangan</th><th>Masuk</th><th>Keluar</th><th>Saldo</th></tr>
-                        </thead>
+                        <thead><tr><th>Tgl</th><th>Keterangan</th><th>Masuk</th><th>Keluar</th><th>Saldo</th></tr></thead>
                         <tbody>${rowsHtml}</tbody>
                     </table>
                 </div>
-            </div>
-        `;
-        container.appendChild(accDiv);
+            </div>`;
+        kasContainer.appendChild(accDiv);
     });
 }
 
 // FUNGSI EXPORT EXCEL
 function exportToExcel() {
-    const ws = XLSX.utils.aoa_to_sheet(allKasData);
+    if (rawKasData.length === 0) return alert("Tunggu data kas dimuat!");
+    const ws = XLSX.utils.aoa_to_sheet(rawKasData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Laporan Kas");
     XLSX.writeFile(wb, `Laporan_Kas_EMURAI_${moment().format('YYYYMMDD')}.xlsx`);
 }
 
-// FUNGSI EXPORT PDF
-// Tambahkan fungsi untuk menangkap grafik menjadi gambar
-// Fungsi membuat grafik yang lebih stabil
+// FUNGSI EXPORT PDF DENGAN GRAFIK
 async function getChartImage() {
     return new Promise((resolve) => {
         try {
             const canvas = document.createElement('canvas');
-            canvas.id = 'tempChartCanvas';
-            canvas.width = 800;
-            canvas.height = 400;
+            canvas.width = 800; canvas.height = 400;
             canvas.style.display = 'none';
             document.body.appendChild(canvas);
-
             const ctx = canvas.getContext('2d');
-            
-            // Hitung data untuk grafik
+
             const monthsGroup = {};
-            for (let i = 1; i < rawKasData.length; i++) {
-                const row = rawKasData[i];
-                if (!row[1]) continue;
+            rawKasData.slice(1).forEach(row => {
+                if (!row[1]) return;
                 if (!monthsGroup[row[1]]) monthsGroup[row[1]] = { in: 0, out: 0 };
-                monthsGroup[row[1]].in += parseInt(row[4].toString().replace(/[^0-9]/g, "")) || 0;
-                monthsGroup[row[1]].out += parseInt(row[5].toString().replace(/[^0-9]/g, "")) || 0;
-            }
+                monthsGroup[row[1]].in += parseInt(row[4]?.toString().replace(/[^0-9]/g, "")) || 0;
+                monthsGroup[row[1]].out += parseInt(row[5]?.toString().replace(/[^0-9]/g, "")) || 0;
+            });
 
             const labels = Object.keys(monthsGroup);
             const dataIn = labels.map(l => monthsGroup[l].in);
             const dataOut = labels.map(l => monthsGroup[l].out);
 
-            const chart = new Chart(ctx, {
+            new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
@@ -282,7 +264,6 @@ async function getChartImage() {
                     ]
                 },
                 options: {
-                    devicePixelRatio: 2,
                     animation: {
                         onComplete: function() {
                             const imgData = canvas.toDataURL('image/png');
@@ -292,32 +273,22 @@ async function getChartImage() {
                     }
                 }
             });
-        } catch (err) {
-            console.error("Gagal buat grafik:", err);
-            resolve(null); // Kirim null agar PDF tetap lanjut meski tanpa grafik
-        }
+        } catch (e) { resolve(null); }
     });
 }
 
-// Fungsi utama Export PDF
 async function exportToPDF() {
     if (rawKasData.length <= 1) return alert("Data kas belum terisi!");
-    
     showLoading(true);
-    
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
         
-        // 1. Tambahkan Header Laporan
         doc.setFontSize(18);
-        doc.setTextColor(40, 40, 40);
         doc.text("LAPORAN BULANAN KAS E-MURAI", 14, 20);
-        
         doc.setFontSize(10);
         doc.text(`Dicetak: ${moment().format('DD/MM/YYYY HH:mm')}`, 14, 27);
         
-        // 2. Tambahkan Grafik (Jika Berhasil)
         const chartBase64 = await getChartImage();
         if (chartBase64) {
             doc.addImage(chartBase64, 'PNG', 14, 35, 180, 70);
@@ -326,8 +297,6 @@ async function exportToPDF() {
 
         let currentY = chartBase64 ? 120 : 40;
         let globalBalance = 0;
-
-        // Grouping Data
         const grouped = {};
         for (let i = 1; i < rawKasData.length; i++) {
             const bulan = rawKasData[i][1];
@@ -335,34 +304,23 @@ async function exportToPDF() {
             grouped[bulan].push(rawKasData[i]);
         }
 
-        // 3. Render Table Per Bulan
-        const monthNames = Object.keys(grouped);
-        
-        for (let m = 0; m < monthNames.length; m++) {
-            const bulan = monthNames[m];
+        for (const bulan of Object.keys(grouped)) {
             const saldoAwal = globalBalance;
-            let mIn = 0;
-            let mOut = 0;
-
-            // Header Bulan & Saldo Sebelumnya
+            let mIn = 0, mOut = 0;
             if (currentY > 250) { doc.addPage(); currentY = 20; }
             
-            doc.setFontSize(11);
-            doc.setFont(undefined, 'bold');
+            doc.setFontSize(11); doc.setFont(undefined, 'bold');
             doc.text(`BULAN: ${bulan.toUpperCase()}`, 14, currentY);
             doc.setFontSize(9);
             doc.text(`Saldo Sebelumnya: Rp ${formatNumber(saldoAwal)}`, 196, currentY, { align: 'right' });
             
             const rows = grouped[bulan].map(r => {
-                const vIn = parseInt(r[4].toString().replace(/[^0-9]/g, "")) || 0;
-                const vOut = parseInt(r[5].toString().replace(/[^0-9]/g, "")) || 0;
-                mIn += vIn;
-                mOut += vOut;
-                globalBalance += (vIn - vOut);
+                const vIn = parseInt(r[4]?.toString().replace(/[^0-9]/g, "")) || 0;
+                const vOut = parseInt(r[5]?.toString().replace(/[^0-9]/g, "")) || 0;
+                mIn += vIn; mOut += vOut; globalBalance += (vIn - vOut);
                 return [r[2], r[3], formatNumber(vIn), formatNumber(vOut), formatNumber(globalBalance)];
             });
 
-            // Footer Bulan (Total)
             rows.push([
                 { content: 'TOTAL '+bulan, colSpan: 2, styles: { fillColor: [245, 245, 245], fontStyle: 'bold' } },
                 { content: formatNumber(mIn), styles: { fillColor: [245, 245, 245], fontStyle: 'bold' } },
@@ -380,25 +338,18 @@ async function exportToPDF() {
                 didDrawPage: (d) => { currentY = d.cursor.y + 15; }
             });
         }
-
         doc.save(`Laporan_Kas_EMurai_${moment().format('MMM_YYYY')}.pdf`);
-
-    } catch (err) {
-        console.error("Fatal Error PDF:", err);
-        alert("Terjadi kesalahan saat membuat PDF: " + err.message);
-    } finally {
-        showLoading(false);
-    }
+    } catch (err) { alert("Gagal membuat PDF: " + err.message); }
+    finally { showLoading(false); }
 }
 
-// 4. JADWAL RONDA (FIXED: Sesuai Header)
+// 4. JADWAL RONDA
 function loadJadwalRonda() {
     fetchAndParseCSV(csvUrls.ronda)
         .then(data => {
             if (data.length === 0) return;
             const headers = data[0];
             let html = `<thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
-            
             for (let i = 1; i < data.length; i++) {
                 if (!data[i][0]) continue;
                 html += '<tr>';
@@ -407,8 +358,7 @@ function loadJadwalRonda() {
                     if (val === 'TRUE' || val === 'FALSE') {
                         html += `<td class="text-center"><input type="checkbox" ${val === 'TRUE' ? 'checked' : ''} disabled></td>`;
                     } else {
-                        let cls = headers[j].toLowerCase().includes('remaining') && parseInt(data[i][j]) > 30 ? 'text-danger font-weight-bold' : '';
-                        html += `<td class="${cls}">${data[i][j] || '-'}</td>`;
+                        html += `<td>${data[i][j] || '-'}</td>`;
                     }
                 }
                 html += '</tr>';
@@ -417,15 +367,4 @@ function loadJadwalRonda() {
             updateLastUpdateTime();
         })
         .finally(() => showLoading(false));
-}
-
-function formatNumber(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
-
-function showToast(m, t = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${t}`;
-    toast.textContent = m;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.classList.add('show'), 10);
-    setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
 }
