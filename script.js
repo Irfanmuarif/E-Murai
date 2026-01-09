@@ -421,7 +421,7 @@ async function exportToPDF() {
             // Buat tabel dengan autoTable
             doc.autoTable({
                 startY: currentY,
-                head: [['Tgl', 'Keterangan', 'Masuk', 'Keluar', 'Saldo Kumulatif']],
+                head: [['Tanggal', 'Keterangan', 'Masuk', 'Keluar', 'Saldo Kumulatif']],
                 body: tableData,
                 theme: 'grid',
                 headStyles: { 
