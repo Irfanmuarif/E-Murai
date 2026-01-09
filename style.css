@@ -581,3 +581,40 @@ input[type="checkbox"]:disabled {
 .month-accordion.active .fa-chevron-down {
     transform: rotate(180deg);
 }
+
+/* Khusus untuk tampilan layar HP (Lebar maksimal 480px) */
+@media screen and (max-width: 480px) {
+    
+    /* 1. Perkecil container tabel agar tidak ada ruang sisa */
+    .table-container {
+        padding: 5px !important;
+        overflow-x: hidden; /* Berusaha menghilangkan scroll jika memungkinkan */
+    }
+
+    /* 2. Perkecil font dan padding tabel Iuran & Ronda */
+    #iuranTable, #rondaTable {
+        font-size: 10px !important; /* Ukuran font lebih kecil */
+        width: 100% !important;
+        table-layout: fixed; /* Memaksa tabel mengikuti lebar layar */
+    }
+
+    #iuranTable th, #iuranTable td,
+    #rondaTable th, #rondaTable td {
+        padding: 4px 2px !important; /* Mempersempit jarak antar teks */
+        word-wrap: break-word; /* Memaksa teks panjang turun ke bawah */
+        text-align: center;
+    }
+
+    /* 3. Menyesuaikan lebar kolom tertentu jika ada yang terlalu lebar */
+    /* Contoh: mengecilkan kolom nomor atau checkbox */
+    #iuranTable th:first-child, 
+    #rondaTable th:first-child {
+        width: 30px;
+    }
+
+    /* 4. Perkecil ukuran checkbox agar tidak memakan ruang */
+    input[type="checkbox"] {
+        transform: scale(0.8);
+        margin: 0;
+    }
+}
