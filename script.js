@@ -245,142 +245,150 @@ function exportToExcel() {
 
 // FUNGSI EXPORT PDF
 // Tambahkan fungsi untuk menangkap grafik menjadi gambar
-function getChartImage() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 400;
-    canvas.height = 200;
-    const ctx = canvas.getContext('2d');
-    
-    // Siapkan data untuk grafik
-    const monthlyLabels = [];
-    const incomeData = [];
-    const expenseData = [];
-    
-    // Ambil data dari tabel yang sudah diproses (kita gunakan logic grouping dari renderUangKas)
-    // Asumsi data kas sudah di-load ke variabel global rawKasData
-    const monthsGroup = {};
-    for (let i = 1; i < rawKasData.length; i++) {
-        const row = rawKasData[i];
-        const bulan = row[1];
-        if (!monthsGroup[bulan]) monthsGroup[bulan] = { in: 0, out: 0 };
-        monthsGroup[bulan].in += parseInt(row[4].toString().replace(/[^0-9]/g, "")) || 0;
-        monthsGroup[bulan].out += parseInt(row[5].toString().replace(/[^0-9]/g, "")) || 0;
-    }
-
-    Object.keys(monthsGroup).forEach(m => {
-        monthlyLabels.push(m);
-        incomeData.push(monthsGroup[m].in);
-        expenseData.push(monthsGroup[m].out);
-    });
-
+// Fungsi membuat grafik yang lebih stabil
+async function getChartImage() {
     return new Promise((resolve) => {
-        const myChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: monthlyLabels,
-                datasets: [
-                    { label: 'Pemasukan', data: incomeData, borderColor: '#06ffa5', tension: 0.3, fill: false },
-                    { label: 'Pengeluaran', data: expenseData, borderColor: '#ff006e', tension: 0.3, fill: false }
-                ]
-            },
-            options: {
-                animation: false,
-                responsive: false,
-                plugins: { legend: { display: true } }
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.id = 'tempChartCanvas';
+            canvas.width = 800;
+            canvas.height = 400;
+            canvas.style.display = 'none';
+            document.body.appendChild(canvas);
+
+            const ctx = canvas.getContext('2d');
+            
+            // Hitung data untuk grafik
+            const monthsGroup = {};
+            for (let i = 1; i < rawKasData.length; i++) {
+                const row = rawKasData[i];
+                if (!row[1]) continue;
+                if (!monthsGroup[row[1]]) monthsGroup[row[1]] = { in: 0, out: 0 };
+                monthsGroup[row[1]].in += parseInt(row[4].toString().replace(/[^0-9]/g, "")) || 0;
+                monthsGroup[row[1]].out += parseInt(row[5].toString().replace(/[^0-9]/g, "")) || 0;
             }
-        });
-        
-        setTimeout(() => {
-            resolve(canvas.toDataURL('image/png'));
-        }, 500);
+
+            const labels = Object.keys(monthsGroup);
+            const dataIn = labels.map(l => monthsGroup[l].in);
+            const dataOut = labels.map(l => monthsGroup[l].out);
+
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Masuk', data: dataIn, borderColor: '#4361ee', backgroundColor: '#4361ee', tension: 0.3 },
+                        { label: 'Keluar', data: dataOut, borderColor: '#ff006e', backgroundColor: '#ff006e', tension: 0.3 }
+                    ]
+                },
+                options: {
+                    devicePixelRatio: 2,
+                    animation: {
+                        onComplete: function() {
+                            const imgData = canvas.toDataURL('image/png');
+                            document.body.removeChild(canvas);
+                            resolve(imgData);
+                        }
+                    }
+                }
+            });
+        } catch (err) {
+            console.error("Gagal buat grafik:", err);
+            resolve(null); // Kirim null agar PDF tetap lanjut meski tanpa grafik
+        }
     });
 }
 
+// Fungsi utama Export PDF
 async function exportToPDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
+    if (rawKasData.length <= 1) return alert("Data kas belum terisi!");
+    
     showLoading(true);
-
-    // 1. Judul & Header
-    doc.setFontSize(18);
-    doc.setTextColor(67, 97, 238);
-    doc.text("LAPORAN KEUANGAN KAS E-MURAI", 14, 20);
     
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Dicetak pada: ${moment().format('DD MMMM YYYY HH:mm')}`, 14, 28);
-
-    // 2. Tambahkan Grafik
-    const chartImg = await getChartImage();
-    doc.addImage(chartImg, 'PNG', 14, 35, 180, 80);
-    
-    // 3. Proses Table per Bulan
-    let currentY = 125;
-    let globalRunningBalance = 0;
-    
-    // Kelompokkan data (sama seperti logic renderUangKas)
-    const monthsGroup = {};
-    for (let i = 1; i < rawKasData.length; i++) {
-        const row = rawKasData[i];
-        if (!monthsGroup[row[1]]) monthsGroup[row[1]] = [];
-        monthsGroup[row[1]].push(row);
-    }
-
-    const monthKeys = Object.keys(monthsGroup);
-
-    for (let mIdx = 0; mIdx < monthKeys.length; mIdx++) {
-        const bulanName = monthKeys[mIdx];
-        const dataBulan = monthsGroup[bulanName];
-        const saldoAwalBulan = globalRunningBalance;
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
         
-        // Cek sisa ruang di halaman
-        if (currentY > 240) { doc.addPage(); currentY = 20; }
-
-        // Header Tabel Bulan
-        doc.setFontSize(12);
-        doc.setTextColor(0);
-        doc.setFont(undefined, 'bold');
-        doc.text(`Bulan: ${bulanName}`, 14, currentY);
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(9);
-        doc.text(`Saldo Sebelumnya: Rp ${formatNumber(saldoAwalBulan)}`, 140, currentY, { align: 'left' });
+        // 1. Tambahkan Header Laporan
+        doc.setFontSize(18);
+        doc.setTextColor(40, 40, 40);
+        doc.text("LAPORAN BULANAN KAS E-MURAI", 14, 20);
         
-        currentY += 5;
+        doc.setFontSize(10);
+        doc.text(`Dicetak: ${moment().format('DD/MM/YYYY HH:mm')}`, 14, 27);
+        
+        // 2. Tambahkan Grafik (Jika Berhasil)
+        const chartBase64 = await getChartImage();
+        if (chartBase64) {
+            doc.addImage(chartBase64, 'PNG', 14, 35, 180, 70);
+            doc.text("Grafik Arus Kas (Pemasukan vs Pengeluaran)", 14, 110);
+        }
 
-        // Siapkan Baris Tabel
-        let monthIn = 0;
-        let monthOut = 0;
-        const rows = dataBulan.map(row => {
-            const inVal = parseInt(row[4].toString().replace(/[^0-9]/g, "")) || 0;
-            const outVal = parseInt(row[5].toString().replace(/[^0-9]/g, "")) || 0;
-            monthIn += inVal;
-            monthOut += outVal;
-            globalRunningBalance += (inVal - outVal);
+        let currentY = chartBase64 ? 120 : 40;
+        let globalBalance = 0;
+
+        // Grouping Data
+        const grouped = {};
+        for (let i = 1; i < rawKasData.length; i++) {
+            const bulan = rawKasData[i][1];
+            if (!grouped[bulan]) grouped[bulan] = [];
+            grouped[bulan].push(rawKasData[i]);
+        }
+
+        // 3. Render Table Per Bulan
+        const monthNames = Object.keys(grouped);
+        
+        for (let m = 0; m < monthNames.length; m++) {
+            const bulan = monthNames[m];
+            const saldoAwal = globalBalance;
+            let mIn = 0;
+            let mOut = 0;
+
+            // Header Bulan & Saldo Sebelumnya
+            if (currentY > 250) { doc.addPage(); currentY = 20; }
             
-            return [row[2], row[3], `+${formatNumber(inVal)}`, `-${formatNumber(outVal)}`, formatNumber(globalRunningBalance)];
-        });
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'bold');
+            doc.text(`BULAN: ${bulan.toUpperCase()}`, 14, currentY);
+            doc.setFontSize(9);
+            doc.text(`Saldo Sebelumnya: Rp ${formatNumber(saldoAwal)}`, 196, currentY, { align: 'right' });
+            
+            const rows = grouped[bulan].map(r => {
+                const vIn = parseInt(r[4].toString().replace(/[^0-9]/g, "")) || 0;
+                const vOut = parseInt(r[5].toString().replace(/[^0-9]/g, "")) || 0;
+                mIn += vIn;
+                mOut += vOut;
+                globalBalance += (vIn - vOut);
+                return [r[2], r[3], formatNumber(vIn), formatNumber(vOut), formatNumber(globalBalance)];
+            });
 
-        // Tambahkan Baris Total di Bawah Table
-        rows.push([
-            { content: 'TOTAL BULAN INI', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-            { content: `+${formatNumber(monthIn)}`, styles: { fontStyle: 'bold', fillColor: [230, 255, 230] } },
-            { content: `-${formatNumber(monthOut)}`, styles: { fontStyle: 'bold', fillColor: [255, 230, 230] } },
-            { content: `Saldo Akhir: ${formatNumber(globalRunningBalance)}`, styles: { fontStyle: 'bold', fillColor: [230, 230, 255] } }
-        ]);
+            // Footer Bulan (Total)
+            rows.push([
+                { content: 'TOTAL '+bulan, colSpan: 2, styles: { fillColor: [245, 245, 245], fontStyle: 'bold' } },
+                { content: formatNumber(mIn), styles: { fillColor: [245, 245, 245], fontStyle: 'bold' } },
+                { content: formatNumber(mOut), styles: { fillColor: [245, 245, 245], fontStyle: 'bold' } },
+                { content: 'Saldo Akhir: ' + formatNumber(globalBalance), styles: { fillColor: [230, 240, 255], fontStyle: 'bold' } }
+            ]);
 
-        doc.autoTable({
-            startY: currentY,
-            head: [['Tgl', 'Keterangan', 'Masuk', 'Keluar', 'Saldo']],
-            body: rows,
-            theme: 'grid',
-            headStyles: { fillColor: [67, 97, 238] },
-            styles: { fontSize: 8 },
-            didDrawPage: (data) => { currentY = data.cursor.y + 15; }
-        });
+            doc.autoTable({
+                startY: currentY + 5,
+                head: [['Tgl', 'Keterangan', 'Masuk', 'Keluar', 'Saldo']],
+                body: rows,
+                theme: 'grid',
+                headStyles: { fillColor: [67, 97, 238] },
+                margin: { left: 14, right: 14 },
+                didDrawPage: (d) => { currentY = d.cursor.y + 15; }
+            });
+        }
+
+        doc.save(`Laporan_Kas_EMurai_${moment().format('MMM_YYYY')}.pdf`);
+
+    } catch (err) {
+        console.error("Fatal Error PDF:", err);
+        alert("Terjadi kesalahan saat membuat PDF: " + err.message);
+    } finally {
+        showLoading(false);
     }
-
-    doc.save(`Laporan_Keuangan_EMurai_${moment().format('YYYY')}.pdf`);
-    showLoading(false);
 }
 
 // 4. JADWAL RONDA (FIXED: Sesuai Header)
