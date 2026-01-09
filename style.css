@@ -581,3 +581,62 @@ input[type="checkbox"]:disabled {
 .month-accordion.active .fa-chevron-down {
     transform: rotate(180deg);
 }
+
+/* Tampilan Baru Jadwal Ronda */
+.ronda-visual-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 10px 0;
+}
+
+.ronda-item {
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.ronda-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.ronda-bar-bg {
+    width: 100%;
+    height: 25px;
+    background: #eef2f7;
+    border-radius: 50px;
+    overflow: hidden;
+    position: relative;
+}
+
+.ronda-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    transition: width 1s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ronda-bar-text {
+    position: absolute;
+    width: 100%;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 25px;
+    color: var(--dark-color);
+    pointer-events: none;
+}
+
+/* Warna khusus jika sedang ronda (0 hari) */
+.status-ronda .ronda-bar-fill {
+    background: linear-gradient(90deg, #00b894, #00cec9);
+}
+.status-ronda .ronda-bar-text {
+    color: white;
+}
