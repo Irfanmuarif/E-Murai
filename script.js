@@ -333,11 +333,38 @@ async function exportToPDF() {
                 head: [['Tgl', 'Keterangan', 'Masuk', 'Keluar', 'Saldo']],
                 body: rows,
                 theme: 'grid',
-                headStyles: { fillColor: [67, 97, 238] },
+                headStyles: { 
+                    fillColor: [67, 97, 238], 
+                    textColor: [255, 255, 255], // Font header putih
+                    fontStyle: 'bold' 
+                },
+                styles: { 
+                    textColor: [0, 0, 0], // Font data HITAM PEKAT (0,0,0)
+                    fontSize: 9,
+                    cellPadding: 3
+                },
+                columnStyles: {
+                    4: { fontStyle: 'bold' } // Kolom Saldo dibuat tebal
+                },
+                // Logika untuk mewarnai baris Total Saldo per bulan
+                didParseCell: function(data) {
+                    // Cek jika ini adalah baris terakhir (baris TOTAL)
+                    if (data.row.index === rows.length - 1) {
+                        data.cell.styles.fillColor = [200, 230, 201]; // Hijau Muda Lembut
+                        data.cell.styles.textColor = [0, 100, 0];    // Font Hijau Tua
+                        data.cell.styles.fontStyle = 'bold';
+                        
+                        // Khusus kolom Saldo Akhir kita beri warna hijau lebih terang
+                        if (data.column.index === 4) {
+                            data.cell.styles.fillColor = [76, 175, 80]; // Hijau Terang (Success)
+                            data.cell.styles.textColor = [255, 255, 255]; // Font Putih
+                        }
+                    }
+                },
                 margin: { left: 14, right: 14 },
                 didDrawPage: (d) => { currentY = d.cursor.y + 15; }
             });
-        }
+            
         doc.save(`Laporan_Kas_EMurai_${moment().format('MMM_YYYY')}.pdf`);
     } catch (err) { alert("Gagal membuat PDF: " + err.message); }
     finally { showLoading(false); }
