@@ -333,11 +333,13 @@ async function exportToPDF() {
         // Kelompokkan data per bulan
         for (let i = 1; i < rawKasData.length; i++) {
             const bulan = rawKasData[i][1];
+            if (!bulan) continue;
             if (!grouped[bulan]) grouped[bulan] = [];
             grouped[bulan].push(rawKasData[i]);
         }
 
         let currentY = 35;
+        // Loop Tabel per Bulan
         for (const bulan of Object.keys(grouped)) {
             const rows = grouped[bulan].map(r => {
                 const vIn = parseInt(r[4]?.toString().replace(/[^0-9]/g, "")) || 0;
@@ -350,6 +352,7 @@ async function exportToPDF() {
 
             doc.setFontSize(12);
             doc.setTextColor(0);
+            doc.setFont(undefined, 'bold');
             doc.text(`Bulan: ${bulan}`, 14, currentY);
             
             doc.autoTable({
@@ -358,59 +361,70 @@ async function exportToPDF() {
                 body: rows,
                 theme: 'grid',
                 headStyles: { fillColor: [67, 97, 238] },
+                styles: { fontSize: 9 },
                 margin: { left: 14, right: 14 },
-                didDrawPage: (d) => { currentY = d.cursor.y + 12; }
+                didDrawPage: (data) => { currentY = data.cursor.y + 12; }
             });
+            currentY = doc.lastAutoTable.finalY + 12;
         }
 
-        // 2. RINGKASAN TOTAL (FOOTER TABEL)
-        if (currentY > 240) { doc.addPage(); currentY = 20; }
+        // 2. RINGKASAN TOTAL (Sesuai permintaan: Pemasukan, Pengeluaran, Sisa Saldo)
+        if (currentY > 220) { doc.addPage(); currentY = 20; }
         
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text("RINGKASAN KESELURUHAN", 14, currentY);
-        currentY += 5;
         
         doc.autoTable({
-            startY: currentY,
+            startY: currentY + 5,
             body: [
-                ['Total Pemasukan', `Rp ${formatNumber(totalMasuk)}`],
-                ['Total Pengeluaran', `Rp ${formatNumber(totalKeluar)}`],
-                ['Sisa Saldo Akhir', `Rp ${formatNumber(globalBalance)}`]
+                ['Total Seluruh Pemasukan', `Rp ${formatNumber(totalMasuk)}`],
+                ['Total Seluruh Pengeluaran', `Rp ${formatNumber(totalKeluar)}`],
+                ['TOTAL SISA SALDO AKHIR', `Rp ${formatNumber(globalBalance)}`]
             ],
             theme: 'plain',
-            styles: { fontSize: 11, cellPadding: 2 },
-            columnStyles: { 0: { fontStyle: 'bold' }, 1: { halign: 'right' } }
+            styles: { fontSize: 11, cellPadding: 3 },
+            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 100 }, 1: { halign: 'right', fontStyle: 'bold' } },
+            didParseCell: function(data) {
+                if (data.row.index === 2) { // Baris Total Sisa Saldo
+                    data.cell.styles.textColor = [0, 184, 148]; // Warna Hijau
+                }
+            }
         });
-        currentY = doc.lastAutoTable.finalY + 15;
+
+        currentY = doc.lastAutoTable.finalY + 20;
 
         // 3. MENAMBAHKAN GRAFIK KE PDF
-        // Kita ambil gambar dari elemen canvas HTML
         const flowCanvas = document.getElementById('flowChart');
         const balanceCanvas = document.getElementById('balanceChart');
 
         if (flowCanvas && balanceCanvas) {
-            if (currentY > 200) { doc.addPage(); currentY = 20; }
+            // Jika sisa halaman dikit, pindah ke halaman baru untuk grafik
+            if (currentY > 180) { doc.addPage(); currentY = 20; }
             
-            doc.text("VISUALISASI GRAFIK", 14, currentY);
+            doc.setFont(undefined, 'bold');
+            doc.text("VISUALISASI TREN KEUANGAN", 14, currentY);
             
+            // Ambil gambar dari canvas dengan kualitas tinggi
             const imgFlow = flowCanvas.toDataURL("image/png", 1.0);
             const imgBalance = balanceCanvas.toDataURL("image/png", 1.0);
             
-            // Masukkan Grafik 1
-            doc.addImage(imgFlow, 'PNG', 14, currentY + 5, 180, 80);
+            // Gambar Grafik Arus Kas
+            doc.addImage(imgFlow, 'PNG', 14, currentY + 5, 182, 80); 
             
-            // Masukkan Grafik 2 (Cek halaman baru jika tidak cukup)
-            if (currentY + 100 > 250) { doc.addPage(); currentY = 20; } else { currentY += 95; }
+            // Cek ruang untuk grafik kedua
+            let nextY = currentY + 95;
+            if (nextY > 200) { doc.addPage(); nextY = 20; }
             
-            doc.addImage(imgBalance, 'PNG', 14, currentY, 180, 80);
+            // Gambar Grafik Saldo Kumulatif
+            doc.addImage(imgBalance, 'PNG', 14, nextY, 182, 80);
         }
 
-        doc.save(`Laporan_Lengkap_EMurai_${moment().format('YYYYMMDD')}.pdf`);
+        doc.save(`Laporan_Keuangan_EMurai_${moment().format('YYYYMMDD')}.pdf`);
         
     } catch (err) { 
-        console.error(err);
-        alert("Gagal PDF: " + err.message); 
+        console.error("Kesalahan PDF:", err);
+        alert("Gagal membuat PDF. Pastikan grafik sudah muncul di layar."); 
     } finally { 
         showLoading(false); 
     }
