@@ -9,8 +9,6 @@ const csvUrls = {
 // Variabel Penampung Data Global
 let rawKasData = []; 
 let rawRondaData = [];
-let flowChartInstance = null;
-let balanceChartInstance = null;
 
 // DOM elements
 const refreshBtn = document.getElementById('refreshBtn');
@@ -139,7 +137,7 @@ function loadIuranBulanan() {
 }
 
 // ---------------------------------------------------------
-// 3. UANG KAS (DASHBOARD, LAPORAN & GRAFIK)
+// 3. UANG KAS (DASHBOARD & LAPORAN)
 // ---------------------------------------------------------
 function loadUangKas() {
     fetchAndParseCSV(csvUrls.kas)
@@ -166,13 +164,11 @@ function renderUangKas(data) {
     const namaBulanTerkini = barisTerakhir[1]; 
     const monthsGroup = {};
 
-    // Proses data dan hitung saldo kumulatif
     for (let i = 1; i < data.length; i++) {
         const row = data[i];
         if (!row[1]) continue;
         const masuk = parseInt(row[4]?.toString().replace(/[^0-9]/g, "")) || 0;
         const keluar = parseInt(row[5]?.toString().replace(/[^0-9]/g, "")) || 0;
-        
         grandTotalSaldo += (masuk - keluar);
 
         if (row[1] === namaBulanTerkini) {
@@ -184,12 +180,10 @@ function renderUangKas(data) {
         monthsGroup[row[1]].push({ tgl: row[2], ket: row[3], masuk, keluar });
     }
 
-    // Update Angka di Card Atas
     document.getElementById('statTotalSaldo').innerText = `Rp ${formatNumber(grandTotalSaldo)}`;
     document.getElementById('statTotalMasuk').innerText = `Rp ${formatNumber(currentMonthIn)}`;
     document.getElementById('statTotalKeluar').innerText = `Rp ${formatNumber(currentMonthOut)}`;
     
-    // Render Accordion per Bulan
     Object.keys(monthsGroup).reverse().forEach((m, idx) => {
         const accDiv = document.createElement('div');
         accDiv.className = `month-accordion ${idx === 0 ? 'active' : ''}`;
@@ -226,229 +220,57 @@ function renderUangKas(data) {
             </div>`;
         kasContainer.appendChild(accDiv);
     });
-
-    // Panggil fungsi untuk membuat grafik
-    prepareCharts(monthsGroup);
-}
-
-function prepareCharts(monthsGroup) {
-    const labels = Object.keys(monthsGroup); // Mengambil nama bulan (Januari, Februari, dst)
-    const dataMasuk = [];
-    const dataKeluar = [];
-    const dataSaldoBulanan = [];
-    
-    let saldoKumulatif = 0;
-
-    labels.forEach(bulan => {
-        let masukBulanIni = 0;
-        let keluarBulanIni = 0;
-        
-        monthsGroup[bulan].forEach(transaksi => {
-            masukBulanIni += transaksi.masuk;
-            keluarBulanIni += transaksi.keluar;
-        });
-        
-        saldoKumulatif += (masukBulanIni - keluarBulanIni);
-        
-        dataMasuk.push(masukBulanIni);
-        dataKeluar.push(keluarBulanIni);
-        dataSaldoBulanan.push(saldoKumulatif);
-    });
-
-    renderFlowChart(labels, dataMasuk, dataKeluar);
-    renderBalanceChart(labels, dataSaldoBulanan);
-}
-
-function renderFlowChart(labels, masuk, keluar) {
-    const ctx = document.getElementById('flowChart').getContext('2d');
-    if (flowChartInstance) flowChartInstance.destroy();
-    
-    flowChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                { label: 'Pemasukan', data: masuk, borderColor: '#00b894', backgroundColor: 'rgba(0, 184, 148, 0.1)', fill: true, tension: 0.3 },
-                { label: 'Pengeluaran', data: keluar, borderColor: '#ff006e', backgroundColor: 'rgba(255, 0, 110, 0.1)', fill: true, tension: 0.3 }
-            ]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Arus Kas Bulanan' } } }
-    });
-}
-
-function renderBalanceChart(labels, saldo) {
-    const ctx = document.getElementById('balanceChart').getContext('2d');
-    if (balanceChartInstance) balanceChartInstance.destroy();
-    
-    balanceChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Total Saldo Kumulatif',
-                data: saldo,
-                borderColor: '#4361ee',
-                backgroundColor: 'rgba(67, 97, 238, 0.2)',
-                fill: true,
-                tension: 0.3,
-                borderWidth: 3
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Tren Saldo Kas' } } }
-    });
 }
 
 function exportToExcel() {
     if (rawKasData.length === 0) return alert("Tunggu data kas dimuat!");
     const ws = XLSX.utils.aoa_to_sheet(rawKasData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Laporan Kas");
+    XLSUtils.book_append_sheet(wb, ws, "Laporan Kas");
     XLSX.writeFile(wb, `Kas_EMURAI_${moment().format('YYYYMMDD')}.xlsx`);
 }
 
 async function exportToPDF() {
     if (rawKasData.length <= 1) return alert("Data kas belum terisi!");
     showLoading(true);
-    
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = doc.internal.pageSize.getWidth();
-        
-        // --- 1. HEADER LAPORAN ---
         doc.setFontSize(18);
-        doc.setTextColor(67, 97, 238);
-        doc.text("LAPORAN KEUANGAN KAS E-MURAI", 14, 20);
+        doc.text("LAPORAN KAS E-MURAI", 14, 20);
         
-        doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.text(`Periode Laporan: ${moment().format('MMMM YYYY')}`, 14, 26);
-        doc.text(`Dicetak pada: ${moment().format('DD/MM/YYYY HH:mm')}`, pageWidth - 14, 26, { align: 'right' });
-        doc.line(14, 28, pageWidth - 14, 28);
-
         let globalBalance = 0;
-        let totalMasukSatuTahun = 0;
-        let totalKeluarSatuTahun = 0;
         const grouped = {};
-        
-        // Kelompokkan data per bulan
         for (let i = 1; i < rawKasData.length; i++) {
             const bulan = rawKasData[i][1];
-            if (!bulan) continue;
             if (!grouped[bulan]) grouped[bulan] = [];
             grouped[bulan].push(rawKasData[i]);
         }
 
-        let currentY = 35;
-
-        // --- 2. LOOP TABEL PER BULAN ---
+        let currentY = 30;
         for (const bulan of Object.keys(grouped)) {
-            let masukBulanIni = 0;
-            let keluarBulanIni = 0;
-
             const rows = grouped[bulan].map(r => {
                 const vIn = parseInt(r[4]?.toString().replace(/[^0-9]/g, "")) || 0;
                 const vOut = parseInt(r[5]?.toString().replace(/[^0-9]/g, "")) || 0;
-                
-                masukBulanIni += vIn;
-                keluarBulanIni += vOut;
-                globalBalance += (vIn - vOut); // Saldo terus bertambah (Kumulatif)
-
+                globalBalance += (vIn - vOut);
                 return [r[2], r[3], formatNumber(vIn), formatNumber(vOut), formatNumber(globalBalance)];
             });
 
-            totalMasukSatuTahun += masukBulanIni;
-            totalKeluarSatuTahun += keluarBulanIni;
-
-            // Judul Bulan
-            doc.setFontSize(12);
-            doc.setTextColor(0);
-            doc.setFont(undefined, 'bold');
             doc.text(`Bulan: ${bulan}`, 14, currentY);
-            
-            // Tabel Data
             doc.autoTable({
-                startY: currentY + 3,
-                head: [['Tgl', 'Keterangan', 'Masuk', 'Keluar', 'Saldo Kumulatif']],
+                startY: currentY + 5,
+                head: [['Tgl', 'Keterangan', 'Masuk', 'Keluar', 'Saldo']],
                 body: rows,
                 theme: 'grid',
                 headStyles: { fillColor: [67, 97, 238] },
-                styles: { fontSize: 9 },
-                margin: { left: 14, right: 14 },
-                // Tambahkan baris total di bawah tiap tabel bulan
-                foot: [[
-                    { content: `Total ${bulan}`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } },
-                    formatNumber(masukBulanIni),
-                    formatNumber(keluarBulanIni),
-                    { content: `Sisa: ${formatNumber(globalBalance)}`, styles: { fontStyle: 'bold', fillColor: [230, 255, 246] } }
-                ]],
-                footStyles: { fillColor: [248, 249, 250], textColor: [0, 0, 0] }
+                didDrawPage: (d) => { currentY = d.cursor.y + 15; }
             });
-
-            currentY = doc.lastAutoTable.finalY + 15;
-            
-            // Cek jika halaman hampir habis
-            if (currentY > 250) {
-                doc.addPage();
-                currentY = 20;
-            }
         }
-
-        // --- 3. RINGKASAN AKHIR (HIJAU) ---
-        if (currentY > 220) { doc.addPage(); currentY = 20; }
-        
-        doc.setFontSize(14);
-        doc.text("RINGKASAN KESELURUHAN", 14, currentY);
-        
-        doc.autoTable({
-            startY: currentY + 5,
-            body: [
-                ['Total Seluruh Pemasukan', `Rp ${formatNumber(totalMasukSatuTahun)}`],
-                ['Total Seluruh Pengeluaran', `Rp ${formatNumber(totalKeluarSatuTahun)}`],
-                ['TOTAL SALDO KAS SAAT INI', `Rp ${formatNumber(globalBalance)}`]
-            ],
-            theme: 'plain',
-            styles: { fontSize: 12, cellPadding: 4 },
-            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 100 }, 1: { halign: 'right', fontStyle: 'bold' } },
-            didParseCell: function(data) {
-                if (data.row.index === 2) { 
-                    data.cell.styles.fillColor = [0, 184, 148]; // Background Hijau
-                    data.cell.styles.textColor = [255, 255, 255]; // Teks Putih
-                }
-            }
-        });
-
-        // --- 4. GRAFIK (DIHALAMAN TERAKHIR) ---
-        doc.addPage();
-        doc.setFontSize(14);
-        doc.setTextColor(0);
-        doc.text("ANALISIS GRAFIK KEUANGAN", 14, 20);
-
-        const flowCanvas = document.getElementById('flowChart');
-        const balanceCanvas = document.getElementById('balanceChart');
-
-        if (flowCanvas && balanceCanvas) {
-            // Ambil gambar dari Chart.js
-            const imgFlow = flowCanvas.toDataURL("image/png", 1.0);
-            const imgBalance = balanceCanvas.toDataURL("image/png", 1.0);
-            
-            doc.setFontSize(11);
-            doc.text("1. Grafik Arus Kas (Masuk vs Keluar)", 14, 30);
-            doc.addImage(imgFlow, 'PNG', 14, 35, 182, 80); 
-            
-            doc.text("2. Tren Pertumbuhan Saldo Kumulatif", 14, 130);
-            doc.addImage(imgBalance, 'PNG', 14, 135, 182, 80);
-        }
-
-        doc.save(`Laporan_Lengkap_EMurai_${moment().format('YYYYMMDD')}.pdf`);
-        
-    } catch (err) { 
-        console.error(err);
-        alert("Gagal membuat PDF. Pastikan menu Uang Kas sudah dibuka agar grafik muncul."); 
-    } finally { 
-        showLoading(false); 
-    }
+        doc.save(`Laporan_Kas_EMurai.pdf`);
+    } catch (err) { alert("Gagal PDF: " + err.message); }
+    finally { showLoading(false); }
 }
+
 // ---------------------------------------------------------
 // 4. JADWAL RONDA (SISTEM BAR VISUAL & SORTING)
 // ---------------------------------------------------------
