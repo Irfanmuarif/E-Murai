@@ -1273,3 +1273,31 @@ input[type="checkbox"]:disabled {
 .font-weight-bold {
     font-weight: 700 !important;
 }
+
+/* Tambahkan CSS ini di bagian CSS Anda */
+.total-row {
+    background-color: rgba(6, 214, 160, 0.15) !important;
+    font-weight: 700 !important;
+    border-top: 2px solid var(--success-color) !important;
+}
+
+.total-row td {
+    padding: 10px 6px !important;
+    font-weight: 700 !important;
+}
+
+.total-row .text-success {
+    color: var(--success-color) !important;
+    font-weight: 700 !important;
+}
+
+.total-row .text-danger {
+    color: var(--danger-color) !important;
+    font-weight: 700 !important;
+}
+
+.total-row .saldo-kumulatif {
+    background-color: rgba(6, 214, 160, 0.3) !important;
+    border-radius: 4px;
+    padding: 4px 8px !important;
+}
