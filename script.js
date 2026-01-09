@@ -15,7 +15,7 @@ const refreshBtn = document.getElementById('refreshBtn');
 const lastUpdate = document.getElementById('lastUpdate');
 const loadingIndicator = document.getElementById('loadingIndicator');
 const navItems = document.querySelectorAll('.nav-item');
-const pages = document.querySelectorAll('.page');
+const pages = document.querySelectorAll('.pages');
 
 // Containers
 const pengumumanList = document.getElementById('pengumumanList');
@@ -137,7 +137,7 @@ function loadIuranBulanan() {
 }
 
 // ---------------------------------------------------------
-// 3. UANG KAS (DASHBOARD & LAPORAN)
+// 3. UANG KAS (DASHBOARD & LAPORAN) - PERBAIKAN SALDO AKUMULATIF
 // ---------------------------------------------------------
 function loadUangKas() {
     fetchAndParseCSV(csvUrls.kas)
@@ -162,58 +162,129 @@ function renderUangKas(data) {
     
     const barisTerakhir = data[data.length - 1];
     const namaBulanTerkini = barisTerakhir[1]; 
+    
+    // Kelompokkan data per bulan
     const monthsGroup = {};
-
+    let globalCumulativeBalance = 0; // Saldo kumulatif global
+    
+    // Langkah 1: Kelompokkan data dan hitung total per bulan
     for (let i = 1; i < data.length; i++) {
         const row = data[i];
         if (!row[1]) continue;
+        
         const masuk = parseInt(row[4]?.toString().replace(/[^0-9]/g, "")) || 0;
         const keluar = parseInt(row[5]?.toString().replace(/[^0-9]/g, "")) || 0;
+        
+        // Hitung grand total saldo
         grandTotalSaldo += (masuk - keluar);
-
+        
+        // Hitung untuk bulan ini
         if (row[1] === namaBulanTerkini) {
             currentMonthIn += masuk;
             currentMonthOut += keluar;
         }
-
-        if (!monthsGroup[row[1]]) monthsGroup[row[1]] = [];
-        monthsGroup[row[1]].push({ tgl: row[2], ket: row[3], masuk, keluar });
+        
+        // Kelompokkan per bulan
+        if (!monthsGroup[row[1]]) {
+            monthsGroup[row[1]] = {
+                bulan: row[1],
+                transaksi: [],
+                totalMasuk: 0,
+                totalKeluar: 0,
+                saldoBulan: 0
+            };
+        }
+        
+        monthsGroup[row[1]].transaksi.push({ 
+            tgl: row[2], 
+            ket: row[3], 
+            masuk, 
+            keluar 
+        });
+        
+        monthsGroup[row[1]].totalMasuk += masuk;
+        monthsGroup[row[1]].totalKeluar += keluar;
     }
+    
+    // Langkah 2: Hitung saldo per bulan secara akumulatif
+    const sortedMonths = Object.keys(monthsGroup).sort((a, b) => {
+        // Urutkan berdasarkan urutan bulan dalam setahun
+        const monthOrder = {
+            'Januari': 1, 'Februari': 2, 'Maret': 3, 'April': 4, 'Mei': 5, 'Juni': 6,
+            'Juli': 7, 'Agustus': 8, 'September': 9, 'Oktober': 10, 'November': 11, 'Desember': 12
+        };
+        return monthOrder[a] - monthOrder[b];
+    });
+    
+    // Hitung saldo kumulatif per bulan
+    const monthsWithCumulative = [];
+    sortedMonths.forEach(monthKey => {
+        const month = monthsGroup[monthKey];
+        const saldoBulan = month.totalMasuk - month.totalKeluar;
+        globalCumulativeBalance += saldoBulan; // Akumulasi dari bulan sebelumnya
+        
+        monthsWithCumulative.push({
+            ...month,
+            saldoKumulatif: globalCumulativeBalance,
+            saldoBulan: saldoBulan
+        });
+    });
 
-    document.getElementById('statTotalSaldo').innerText = `Rp ${formatNumber(grandTotalSaldo)}`;
+    // Update statistik dashboard
+    document.getElementById('statTotalSaldo').innerText = `Rp ${formatNumber(globalCumulativeBalance)}`;
     document.getElementById('statTotalMasuk').innerText = `Rp ${formatNumber(currentMonthIn)}`;
     document.getElementById('statTotalKeluar').innerText = `Rp ${formatNumber(currentMonthOut)}`;
     
-    Object.keys(monthsGroup).reverse().forEach((m, idx) => {
-        const accDiv = document.createElement('div');
-        accDiv.className = `month-accordion ${idx === 0 ? 'active' : ''}`;
+    // Langkah 3: Render accordion per bulan dengan saldo kumulatif
+    let cumulativePerBulan = 0;
+    
+    monthsWithCumulative.reverse().forEach((monthData, idx) => {
+        // Untuk setiap bulan, kita hitung ulang cumulative dari transaksi per baris
+        let saldoBulanIni = 0;
+        let cumulativeInMonth = cumulativePerBulan;
         
-        let subBalance = 0;
-        let rowsHtml = monthsGroup[m].map(item => {
-            subBalance += (item.masuk - item.keluar);
+        const rowsHtml = monthData.transaksi.map(item => {
+            const saldoTransaksi = item.masuk - item.keluar;
+            saldoBulanIni += saldoTransaksi;
+            cumulativeInMonth += saldoTransaksi;
+            
             return `
                 <tr>
                     <td>${item.tgl}</td>
                     <td>${item.ket}</td>
                     <td><span class="badge ${item.masuk > 0 ? 'badge-in' : ''}">${item.masuk > 0 ? '+' + formatNumber(item.masuk) : '-'}</span></td>
                     <td><span class="badge ${item.keluar > 0 ? 'badge-out' : ''}">${item.keluar > 0 ? '-' + formatNumber(item.keluar) : '-'}</span></td>
-                    <td class="text-right"><strong>${formatNumber(subBalance)}</strong></td>
+                    <td class="text-right"><strong>${formatNumber(cumulativeInMonth)}</strong></td>
                 </tr>`;
         }).join('');
+        
+        // Update cumulative untuk bulan berikutnya (yang lebih lama)
+        cumulativePerBulan += monthData.saldoBulan;
 
+        const accDiv = document.createElement('div');
+        accDiv.className = `month-accordion ${idx === 0 ? 'active' : ''}`;
+        
         accDiv.innerHTML = `
             <div class="accordion-header" onclick="this.parentElement.classList.toggle('active')">
-                <div class="acc-left"><i class="fas fa-calendar-check"></i> <span>${m}</span></div>
+                <div class="acc-left"><i class="fas fa-calendar-check"></i> <span>${monthData.bulan}</span></div>
                 <div class="acc-right">
                     <span class="label-saldo-header">Saldo Akhir:</span>
-                    <span class="value-saldo-header">Rp ${formatNumber(subBalance)}</span>
+                    <span class="value-saldo-header">Rp ${formatNumber(monthData.saldoKumulatif)}</span>
                     <i class="fas fa-chevron-down ml-10"></i>
                 </div>
             </div>
             <div class="accordion-content">
                 <div class="table-container">
                     <table class="data-table">
-                        <thead><tr><th>Tgl</th><th>Keterangan</th><th>Masuk</th><th>Keluar</th><th>Saldo</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Tgl</th>
+                                <th>Keterangan</th>
+                                <th>Masuk</th>
+                                <th>Keluar</th>
+                                <th>Saldo Kumulatif</th>
+                            </tr>
+                        </thead>
                         <tbody>${rowsHtml}</tbody>
                     </table>
                 </div>
@@ -226,7 +297,7 @@ function exportToExcel() {
     if (rawKasData.length === 0) return alert("Tunggu data kas dimuat!");
     const ws = XLSX.utils.aoa_to_sheet(rawKasData);
     const wb = XLSX.utils.book_new();
-    XLSUtils.book_append_sheet(wb, ws, "Laporan Kas");
+    XLSX.utils.book_append_sheet(wb, ws, "Laporan Kas");
     XLSX.writeFile(wb, `Kas_EMURAI_${moment().format('YYYYMMDD')}.xlsx`);
 }
 
@@ -241,14 +312,26 @@ async function exportToPDF() {
         
         let globalBalance = 0;
         const grouped = {};
+        
+        // Kelompokkan data per bulan
         for (let i = 1; i < rawKasData.length; i++) {
             const bulan = rawKasData[i][1];
             if (!grouped[bulan]) grouped[bulan] = [];
             grouped[bulan].push(rawKasData[i]);
         }
+        
+        // Urutkan bulan
+        const sortedMonths = Object.keys(grouped).sort((a, b) => {
+            const monthOrder = {
+                'Januari': 1, 'Februari': 2, 'Maret': 3, 'April': 4, 'Mei': 5, 'Juni': 6,
+                'Juli': 7, 'Agustus': 8, 'September': 9, 'Oktober': 10, 'November': 11, 'Desember': 12
+            };
+            return monthOrder[a] - monthOrder[b];
+        });
 
         let currentY = 30;
-        for (const bulan of Object.keys(grouped)) {
+        
+        for (const bulan of sortedMonths) {
             const rows = grouped[bulan].map(r => {
                 const vIn = parseInt(r[4]?.toString().replace(/[^0-9]/g, "")) || 0;
                 const vOut = parseInt(r[5]?.toString().replace(/[^0-9]/g, "")) || 0;
@@ -259,16 +342,27 @@ async function exportToPDF() {
             doc.text(`Bulan: ${bulan}`, 14, currentY);
             doc.autoTable({
                 startY: currentY + 5,
-                head: [['Tgl', 'Keterangan', 'Masuk', 'Keluar', 'Saldo']],
+                head: [['Tgl', 'Keterangan', 'Masuk', 'Keluar', 'Saldo Kumulatif']],
                 body: rows,
                 theme: 'grid',
                 headStyles: { fillColor: [67, 97, 238] },
                 didDrawPage: (d) => { currentY = d.cursor.y + 15; }
             });
         }
-        doc.save(`Laporan_Kas_EMurai.pdf`);
-    } catch (err) { alert("Gagal PDF: " + err.message); }
-    finally { showLoading(false); }
+        
+        // Tambahkan summary di akhir
+        currentY += 10;
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text(`Total Saldo Akhir: Rp ${formatNumber(globalBalance)}`, 14, currentY);
+        
+        doc.save(`Laporan_Kas_EMurai_${moment().format('YYYYMMDD')}.pdf`);
+    } catch (err) { 
+        alert("Gagal membuat PDF: " + err.message); 
+    }
+    finally { 
+        showLoading(false); 
+    }
 }
 
 // ---------------------------------------------------------
@@ -365,7 +459,7 @@ async function exportRondaPDF() {
             styles: { fontSize: 7 }
         });
 
-        doc.save(`Histori_Ronda_EMurai.pdf`);
+        doc.save(`Histori_Ronda_EMurai_${moment().format('YYYYMMDD')}.pdf`);
     } catch (err) { alert("Error: " + err.message); }
     finally { showLoading(false); }
 }
