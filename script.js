@@ -15,7 +15,7 @@ const refreshBtn = document.getElementById('refreshBtn');
 const lastUpdate = document.getElementById('lastUpdate');
 const loadingIndicator = document.getElementById('loadingIndicator');
 const navItems = document.querySelectorAll('.nav-item');
-const pages = document.querySelectorAll('.page'); // PERBAIKAN: dari '.pages' ke '.page'
+const pages = document.querySelectorAll('.page');
 
 // Containers
 const pengumumanList = document.getElementById('pengumumanList');
@@ -137,7 +137,7 @@ function loadIuranBulanan() {
 }
 
 // ---------------------------------------------------------
-// 3. UANG KAS (DASHBOARD & LAPORAN) - PERBAIKAN SALDO AKUMULATIF
+// 3. UANG KAS (DASHBOARD & LAPORAN) - PERBAIKAN SALDO AKUMULATIF YANG BENAR
 // ---------------------------------------------------------
 function loadUangKas() {
     fetchAndParseCSV(csvUrls.kas)
@@ -156,38 +156,35 @@ function renderUangKas(data) {
         return;
     }
 
-    let grandTotalSaldo = 0;
-    let currentMonthIn = 0;
-    let currentMonthOut = 0;
+    // Langkah 1: Proses semua data untuk mendapatkan total per bulan dan urutan yang benar
+    const bulanData = {};
+    const semuaTransaksi = []; // Menyimpan semua transaksi dalam urutan kronologis
     
-    const barisTerakhir = data[data.length - 1];
-    const namaBulanTerkini = barisTerakhir[1]; 
-    
-    // Kelompokkan data per bulan
-    const monthsGroup = {};
-    let globalCumulativeBalance = 0; // Saldo kumulatif global
-    
-    // Langkah 1: Kelompokkan data dan hitung total per bulan
+    // Kumpulkan semua transaksi
     for (let i = 1; i < data.length; i++) {
         const row = data[i];
         if (!row[1]) continue;
         
         const masuk = parseInt(row[4]?.toString().replace(/[^0-9]/g, "")) || 0;
         const keluar = parseInt(row[5]?.toString().replace(/[^0-9]/g, "")) || 0;
+        const saldoTransaksi = masuk - keluar;
         
-        // Hitung grand total saldo
-        grandTotalSaldo += (masuk - keluar);
+        // Simpan transaksi
+        const transaksi = {
+            bulan: row[1],
+            tgl: row[2],
+            ket: row[3],
+            masuk,
+            keluar,
+            saldoTransaksi
+        };
         
-        // Hitung untuk bulan ini
-        if (row[1] === namaBulanTerkini) {
-            currentMonthIn += masuk;
-            currentMonthOut += keluar;
-        }
+        semuaTransaksi.push(transaksi);
         
         // Kelompokkan per bulan
-        if (!monthsGroup[row[1]]) {
-            monthsGroup[row[1]] = {
-                bulan: row[1],
+        if (!bulanData[row[1]]) {
+            bulanData[row[1]] = {
+                namaBulan: row[1],
                 transaksi: [],
                 totalMasuk: 0,
                 totalKeluar: 0,
@@ -195,58 +192,62 @@ function renderUangKas(data) {
             };
         }
         
-        monthsGroup[row[1]].transaksi.push({ 
-            tgl: row[2], 
-            ket: row[3], 
-            masuk, 
-            keluar 
-        });
-        
-        monthsGroup[row[1]].totalMasuk += masuk;
-        monthsGroup[row[1]].totalKeluar += keluar;
+        bulanData[row[1]].transaksi.push(transaksi);
+        bulanData[row[1]].totalMasuk += masuk;
+        bulanData[row[1]].totalKeluar += keluar;
+        bulanData[row[1]].saldoBulan += saldoTransaksi;
     }
     
-    // Langkah 2: Hitung saldo per bulan secara akumulatif
-    const sortedMonths = Object.keys(monthsGroup).sort((a, b) => {
-        // Urutkan berdasarkan urutan bulan dalam setahun
-        const monthOrder = {
-            'Januari': 1, 'Februari': 2, 'Maret': 3, 'April': 4, 'Mei': 5, 'Juni': 6,
-            'Juli': 7, 'Agustus': 8, 'September': 9, 'Oktober': 10, 'November': 11, 'Desember': 12
-        };
-        return monthOrder[a] - monthOrder[b];
-    });
+    // Langkah 2: Urutkan bulan secara kronologis
+    const urutanBulan = {
+        'Januari': 1, 'Februari': 2, 'Maret': 3, 'April': 4, 'Mei': 5, 'Juni': 6,
+        'Juli': 7, 'Agustus': 8, 'September': 9, 'Oktober': 10, 'November': 11, 'Desember': 12
+    };
     
-    // Hitung saldo kumulatif per bulan
-    const monthsWithCumulative = [];
-    sortedMonths.forEach(monthKey => {
-        const month = monthsGroup[monthKey];
-        const saldoBulan = month.totalMasuk - month.totalKeluar;
-        globalCumulativeBalance += saldoBulan; // Akumulasi dari bulan sebelumnya
+    const sortedBulanKeys = Object.keys(bulanData).sort((a, b) => urutanBulan[a] - urutanBulan[b]);
+    
+    // Langkah 3: Hitung saldo kumulatif per bulan
+    let saldoKumulatifHinggaSekarang = 0;
+    const bulanDenganSaldoKumulatif = [];
+    
+    for (const bulanKey of sortedBulanKeys) {
+        const bulan = bulanData[bulanKey];
+        saldoKumulatifHinggaSekarang += bulan.saldoBulan;
         
-        monthsWithCumulative.push({
-            ...month,
-            saldoKumulatif: globalCumulativeBalance,
-            saldoBulan: saldoBulan
+        bulanDenganSaldoKumulatif.push({
+            ...bulan,
+            saldoKumulatif: saldoKumulatifHinggaSekarang
         });
-    });
-
+    }
+    
+    // Langkah 4: Hitung statistik untuk bulan terbaru (untuk dashboard)
+    const bulanTerbaru = sortedBulanKeys[sortedBulanKeys.length - 1];
+    const currentMonthIn = bulanTerbaru ? bulanData[bulanTerbaru].totalMasuk : 0;
+    const currentMonthOut = bulanTerbaru ? bulanData[bulanTerbaru].totalKeluar : 0;
+    
     // Update statistik dashboard
-    document.getElementById('statTotalSaldo').innerText = `Rp ${formatNumber(globalCumulativeBalance)}`;
+    document.getElementById('statTotalSaldo').innerText = `Rp ${formatNumber(saldoKumulatifHinggaSekarang)}`;
     document.getElementById('statTotalMasuk').innerText = `Rp ${formatNumber(currentMonthIn)}`;
     document.getElementById('statTotalKeluar').innerText = `Rp ${formatNumber(currentMonthOut)}`;
     
-    // Langkah 3: Render accordion per bulan dengan saldo kumulatif
-    let cumulativePerBulan = 0;
+    // Langkah 5: Render accordion dengan urutan bulan terbaru di atas
+    // Kita perlu menghitung saldo kumulatif per transaksi untuk setiap bulan
+    // Pertama, buat peta saldo kumulatif per bulan
+    const saldoSebelumBulan = {}; // Saldo kumulatif sebelum bulan tertentu
+    let saldoSebelum = 0;
     
-    monthsWithCumulative.reverse().forEach((monthData, idx) => {
-        // Untuk setiap bulan, kita hitung ulang cumulative dari transaksi per baris
-        let saldoBulanIni = 0;
-        let cumulativeInMonth = cumulativePerBulan;
+    for (const bulanKey of sortedBulanKeys) {
+        saldoSebelumBulan[bulanKey] = saldoSebelum;
+        saldoSebelum += bulanData[bulanKey].saldoBulan;
+    }
+    
+    // Render dari bulan terbaru ke terlama
+    bulanDenganSaldoKumulatif.reverse().forEach((bulanData, idx) => {
+        // Mulai dari saldo kumulatif sebelum bulan ini
+        let saldoBerjalan = saldoSebelumBulan[bulanData.namaBulan];
         
-        const rowsHtml = monthData.transaksi.map(item => {
-            const saldoTransaksi = item.masuk - item.keluar;
-            saldoBulanIni += saldoTransaksi;
-            cumulativeInMonth += saldoTransaksi;
+        const rowsHtml = bulanData.transaksi.map(item => {
+            saldoBerjalan += (item.masuk - item.keluar);
             
             return `
                 <tr>
@@ -254,22 +255,19 @@ function renderUangKas(data) {
                     <td>${item.ket}</td>
                     <td><span class="badge ${item.masuk > 0 ? 'badge-in' : ''}">${item.masuk > 0 ? '+' + formatNumber(item.masuk) : '-'}</span></td>
                     <td><span class="badge ${item.keluar > 0 ? 'badge-out' : ''}">${item.keluar > 0 ? '-' + formatNumber(item.keluar) : '-'}</span></td>
-                    <td class="text-right"><strong>${formatNumber(cumulativeInMonth)}</strong></td>
+                    <td class="text-right"><strong>${formatNumber(saldoBerjalan)}</strong></td>
                 </tr>`;
         }).join('');
         
-        // Update cumulative untuk bulan berikutnya (yang lebih lama)
-        cumulativePerBulan += monthData.saldoBulan;
-
         const accDiv = document.createElement('div');
         accDiv.className = `month-accordion ${idx === 0 ? 'active' : ''}`;
         
         accDiv.innerHTML = `
             <div class="accordion-header" onclick="this.parentElement.classList.toggle('active')">
-                <div class="acc-left"><i class="fas fa-calendar-check"></i> <span>${monthData.bulan}</span></div>
+                <div class="acc-left"><i class="fas fa-calendar-check"></i> <span>${bulanData.namaBulan}</span></div>
                 <div class="acc-right">
                     <span class="label-saldo-header">Saldo Akhir:</span>
-                    <span class="value-saldo-header">Rp ${formatNumber(monthData.saldoKumulatif)}</span>
+                    <span class="value-saldo-header">Rp ${formatNumber(bulanData.saldoKumulatif)}</span>
                     <i class="fas fa-chevron-down ml-10"></i>
                 </div>
             </div>
@@ -310,10 +308,8 @@ async function exportToPDF() {
         doc.setFontSize(18);
         doc.text("LAPORAN KAS E-MURAI", 14, 20);
         
-        let globalBalance = 0;
+        // Urutkan data berdasarkan bulan
         const grouped = {};
-        
-        // Kelompokkan data per bulan
         for (let i = 1; i < rawKasData.length; i++) {
             const bulan = rawKasData[i][1];
             if (!grouped[bulan]) grouped[bulan] = [];
@@ -321,14 +317,14 @@ async function exportToPDF() {
         }
         
         // Urutkan bulan
-        const sortedMonths = Object.keys(grouped).sort((a, b) => {
-            const monthOrder = {
-                'Januari': 1, 'Februari': 2, 'Maret': 3, 'April': 4, 'Mei': 5, 'Juni': 6,
-                'Juli': 7, 'Agustus': 8, 'September': 9, 'Oktober': 10, 'November': 11, 'Desember': 12
-            };
-            return monthOrder[a] - monthOrder[b];
-        });
+        const urutanBulan = {
+            'Januari': 1, 'Februari': 2, 'Maret': 3, 'April': 4, 'Mei': 5, 'Juni': 6,
+            'Juli': 7, 'Agustus': 8, 'September': 9, 'Oktober': 10, 'November': 11, 'Desember': 12
+        };
+        
+        const sortedMonths = Object.keys(grouped).sort((a, b) => urutanBulan[a] - urutanBulan[b]);
 
+        let globalBalance = 0;
         let currentY = 30;
         
         for (const bulan of sortedMonths) {
