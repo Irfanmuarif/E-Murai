@@ -127,7 +127,6 @@ function loadIuranBulanan() {
                 for (let j = 0; j < headers.length; j++) {
                     const val = (data[i][j] || "").toString().trim().toUpperCase();
                     if (val === 'TRUE' || val === 'FALSE') {
-                        // Checkbox dengan warna hijau
                         html += `<td class="text-center">
                             <div class="checkbox-container">
                                 <input type="checkbox" ${val === 'TRUE' ? 'checked' : ''} disabled>
@@ -288,7 +287,7 @@ function renderUangKas(data) {
         const accDiv = document.createElement('div');
         accDiv.className = `month-accordion ${idx === 0 ? 'active' : ''}`;
         
-        // Header dengan saldo hanya muncul saat accordion aktif (terbuka)
+        // PERUBAHAN: Header hanya menampilkan nama bulan saja, TANPA saldo
         accDiv.innerHTML = `
             <div class="accordion-header" onclick="toggleKasAccordion(this)">
                 <div class="acc-left">
@@ -296,9 +295,6 @@ function renderUangKas(data) {
                     <span class="month-name">${bulanDataItem.namaBulan}</span>
                 </div>
                 <div class="acc-right">
-                    <span class="saldo-info ${idx === 0 ? '' : 'hidden'}">
-                        Saldo: <strong class="saldo-value">Rp ${formatNumber(bulanDataItem.saldoKumulatif)}</strong>
-                    </span>
                     <i class="fas fa-chevron-down ml-10"></i>
                 </div>
             </div>
@@ -329,23 +325,15 @@ function renderUangKas(data) {
 function toggleKasAccordion(headerElement) {
     const accordion = headerElement.parentElement;
     const isActive = accordion.classList.contains('active');
-    const saldoInfo = headerElement.querySelector('.saldo-info');
     
     // Tutup semua accordion terlebih dahulu
     document.querySelectorAll('.month-accordion').forEach(acc => {
         acc.classList.remove('active');
-        const otherSaldoInfo = acc.querySelector('.saldo-info');
-        if (otherSaldoInfo) {
-            otherSaldoInfo.classList.add('hidden');
-        }
     });
     
     // Jika accordion ini sebelumnya tidak aktif, buka
     if (!isActive) {
         accordion.classList.add('active');
-        if (saldoInfo) {
-            saldoInfo.classList.remove('hidden');
-        }
     }
 }
 
@@ -396,14 +384,9 @@ async function exportToPDF() {
             saldo: []
         };
         
-        // Tentukan lebar kolom (dalam mm)
-        const columnWidths = {
-            tgl: 22,       // Kolom Tgl lebih lebar
-            keterangan: 48, // Kolom Keterangan
-            masuk: 25,     // Kolom Masuk
-            keluar: 25,    // Kolom Keluar
-            saldo: 30      // Kolom Saldo
-        };
+        // Tentukan lebar kolom yang sama rata
+        const totalColumns = 5;
+        const equalColumnWidth = contentWidth / totalColumns - 5; // Kurangi sedikit untuk border
         
         // Proses setiap bulan dalam urutan kronologis (lama ke baru)
         for (const bulan of sortedMonths) {
@@ -459,12 +442,12 @@ async function exportToPDF() {
             tableData.push([
                 '',
                 `TOTAL ${bulan.toUpperCase()}:`,
-                `+${formatNumber(totalMasuk)}`,
-                `-${formatNumber(totalKeluar)}`,
-                `Rp ${formatNumber(globalBalance)}`
+                formatNumber(totalMasuk),
+                formatNumber(totalKeluar),
+                formatNumber(globalBalance)
             ]);
             
-            // Buat tabel dengan autoTable - DENGAN KOLOM YANG LEBIH LEBAR
+            // Buat tabel dengan autoTable - DENGAN WARNA HITAM SEMUA DAN KOLOM SAMA RATA
             doc.autoTable({
                 startY: currentY,
                 head: [['Tanggal', 'Keterangan', 'Masuk', 'Keluar', 'Saldo Kumulatif']],
@@ -473,38 +456,46 @@ async function exportToPDF() {
                 headStyles: { 
                     fillColor: [67, 97, 238], 
                     fontSize: 9,
-                    textColor: [255, 255, 255],
-                    halign: 'center'
+                    textColor: [255, 255, 255], // Putih untuk header
+                    halign: 'center',
+                    fontStyle: 'bold'
                 },
                 bodyStyles: { 
                     fontSize: 8,
                     cellPadding: 3,
-                    overflow: 'linebreak'
+                    overflow: 'linebreak',
+                    textColor: [0, 0, 0], // WARNA HITAM untuk semua teks di body
+                    fontStyle: 'normal'
                 },
                 columnStyles: {
                     0: { 
-                        cellWidth: columnWidths.tgl, 
+                        cellWidth: equalColumnWidth, 
                         halign: 'center',
-                        minCellWidth: columnWidths.tgl - 2
+                        minCellWidth: equalColumnWidth - 2,
+                        textColor: [0, 0, 0] // Hitam
                     },
                     1: { 
-                        cellWidth: columnWidths.keterangan,
-                        minCellWidth: columnWidths.keterangan - 3
+                        cellWidth: equalColumnWidth + 10, // Keterangan sedikit lebih lebar
+                        minCellWidth: equalColumnWidth,
+                        textColor: [0, 0, 0] // Hitam
                     },
                     2: { 
-                        cellWidth: columnWidths.masuk, 
+                        cellWidth: equalColumnWidth, 
                         halign: 'right',
-                        minCellWidth: columnWidths.masuk - 2
+                        minCellWidth: equalColumnWidth - 2,
+                        textColor: [0, 0, 0] // Hitam
                     },
                     3: { 
-                        cellWidth: columnWidths.keluar, 
+                        cellWidth: equalColumnWidth, 
                         halign: 'right',
-                        minCellWidth: columnWidths.keluar - 2
+                        minCellWidth: equalColumnWidth - 2,
+                        textColor: [0, 0, 0] // Hitam
                     },
                     4: { 
-                        cellWidth: columnWidths.saldo, 
+                        cellWidth: equalColumnWidth, 
                         halign: 'right',
-                        minCellWidth: columnWidths.saldo - 2
+                        minCellWidth: equalColumnWidth - 2,
+                        textColor: [0, 0, 0] // Hitam
                     }
                 },
                 margin: { left: margin, right: margin },
@@ -523,23 +514,28 @@ async function exportToPDF() {
                         // Font bold untuk total
                         doc.setFont(undefined, 'bold');
                         
+                        // Text color hitam untuk total
+                        doc.setTextColor(0, 0, 0);
+                        
                         // Background lebih gelap untuk kolom saldo
                         if (data.column.index === 4) {
                             doc.setFillColor(200, 250, 237);
                             doc.roundedRect(data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2, 2, 2, 'F');
                         }
+                    } else {
+                        // Untuk baris biasa, pastikan warna hitam
+                        doc.setTextColor(0, 0, 0);
                     }
                 },
                 didParseCell: function(data) {
                     // Parse khusus untuk baris total
                     if (data.row.index === tableData.length - 1) {
-                        if (data.column.index === 2) {
-                            data.cell.styles.textColor = [6, 214, 160];
-                        } else if (data.column.index === 3) {
-                            data.cell.styles.textColor = [239, 71, 111];
-                        } else if (data.column.index === 4) {
-                            data.cell.styles.fontStyle = 'bold';
-                        }
+                        // Untuk baris total, semua teks hitam dan bold
+                        data.cell.styles.textColor = [0, 0, 0]; // Hitam
+                        data.cell.styles.fontStyle = 'bold';
+                    } else {
+                        // Untuk baris biasa, semua teks hitam
+                        data.cell.styles.textColor = [0, 0, 0]; // Hitam
                     }
                     
                     // Untuk kolom Tgl, pastikan teks tidak terlalu panjang
@@ -551,6 +547,8 @@ async function exportToPDF() {
                 },
                 didDrawPage: (d) => { 
                     currentY = d.cursor.y + 5;
+                    // Reset text color ke hitam setelah menggambar tabel
+                    doc.setTextColor(0, 0, 0);
                 }
             });
             
@@ -564,6 +562,7 @@ async function exportToPDF() {
         // Chart 1: Pemasukan vs Pengeluaran
         doc.setFontSize(16);
         doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0); // Hitam
         doc.text("GRAFIK PEMASUKAN vs PENGELUARAN", 105, currentY, { align: 'center' });
         currentY += 10;
         
@@ -610,7 +609,8 @@ async function exportToPDF() {
                             display: true,
                             text: 'Trend Pemasukan dan Pengeluaran per Bulan',
                             font: {
-                                size: 14
+                                size: 14,
+                                color: '#000000' // Hitam
                             }
                         },
                         legend: {
@@ -618,7 +618,8 @@ async function exportToPDF() {
                             labels: {
                                 font: {
                                     size: 10
-                                }
+                                },
+                                color: '#000000' // Hitam
                             }
                         }
                     },
@@ -627,7 +628,11 @@ async function exportToPDF() {
                             ticks: {
                                 font: {
                                     size: 9
-                                }
+                                },
+                                color: '#000000' // Hitam
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)' // Grid abu-abu muda
                             }
                         },
                         y: {
@@ -636,6 +641,7 @@ async function exportToPDF() {
                                 font: {
                                     size: 9
                                 },
+                                color: '#000000', // Hitam
                                 callback: function(value) {
                                     if (value >= 1000000) {
                                         return 'Rp ' + (value / 1000000).toFixed(1) + 'jt';
@@ -644,6 +650,9 @@ async function exportToPDF() {
                                     }
                                     return 'Rp ' + value;
                                 }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)' // Grid abu-abu muda
                             }
                         }
                     }
@@ -660,6 +669,7 @@ async function exportToPDF() {
         // Chart 2: Saldo Kumulatif
         doc.setFontSize(16);
         doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0); // Hitam
         doc.text("GRAFIK SALDO KUMULATIF", 105, currentY, { align: 'center' });
         currentY += 10;
         
@@ -694,7 +704,8 @@ async function exportToPDF() {
                             display: true,
                             text: 'Perkembangan Saldo Kas dari Waktu ke Waktu',
                             font: {
-                                size: 14
+                                size: 14,
+                                color: '#000000' // Hitam
                             }
                         },
                         legend: {
@@ -702,7 +713,8 @@ async function exportToPDF() {
                             labels: {
                                 font: {
                                     size: 10
-                                }
+                                },
+                                color: '#000000' // Hitam
                             }
                         }
                     },
@@ -711,7 +723,11 @@ async function exportToPDF() {
                             ticks: {
                                 font: {
                                     size: 9
-                                }
+                                },
+                                color: '#000000' // Hitam
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)' // Grid abu-abu muda
                             }
                         },
                         y: {
@@ -720,6 +736,7 @@ async function exportToPDF() {
                                 font: {
                                     size: 9
                                 },
+                                color: '#000000', // Hitam
                                 callback: function(value) {
                                     if (value >= 1000000) {
                                         return 'Rp ' + (value / 1000000).toFixed(1) + 'jt';
@@ -728,6 +745,9 @@ async function exportToPDF() {
                                     }
                                     return 'Rp ' + value;
                                 }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)' // Grid abu-abu muda
                             }
                         }
                     }
@@ -749,6 +769,7 @@ async function exportToPDF() {
         currentY += 10;
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0); // Hitam
         doc.text("RINGKASAN AKHIR", margin, currentY);
         currentY += 8;
         
@@ -757,6 +778,7 @@ async function exportToPDF() {
         
         doc.setFont(undefined, 'normal');
         doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0); // Hitam
         
         const summaryWidth = contentWidth;
         const summaryHeight = 25;
@@ -778,9 +800,10 @@ async function exportToPDF() {
         doc.setFontSize(11);
         doc.text(`Saldo Akhir: Rp ${formatNumber(globalBalance)}`, col2, currentY + 12);
         
-        // Footer
+        // Footer - hitam semua
         doc.setFontSize(9);
         doc.setFont(undefined, 'italic');
+        doc.setTextColor(0, 0, 0); // Hitam
         doc.text(`Laporan dicetak pada: ${moment().format('DD/MM/YYYY HH:mm')}`, 105, 285, { align: 'center' });
         doc.text(`© E-MURAI ${new Date().getFullYear()}`, 105, 290, { align: 'center' });
         
