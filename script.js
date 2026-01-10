@@ -92,7 +92,10 @@ function loadPengumuman() {
     fetchAndParseCSV(csvUrls.pengumuman)
         .then(data => {
             pengumumanList.innerHTML = '';
-            if (data.length <= 1) { pengumumanList.innerHTML = '<p>Tidak ada pengumuman.</p>'; return; }
+            if (data.length <= 1) { 
+                pengumumanList.innerHTML = '<p>Tidak ada pengumuman.</p>'; 
+                return; 
+            }
             for (let i = 1; i < data.length; i++) {
                 const [id, tgl, judul, isi, pengirim] = data[i];
                 const card = document.createElement('div');
@@ -124,7 +127,12 @@ function loadIuranBulanan() {
                 for (let j = 0; j < headers.length; j++) {
                     const val = (data[i][j] || "").toString().trim().toUpperCase();
                     if (val === 'TRUE' || val === 'FALSE') {
-                        html += `<td class="text-center"><div class="checkbox-container"><input type="checkbox" ${val === 'TRUE' ? 'checked' : ''} disabled></div></td>`;
+                        // Checkbox dengan warna hijau
+                        html += `<td class="text-center">
+                            <div class="checkbox-container">
+                                <input type="checkbox" ${val === 'TRUE' ? 'checked' : ''} disabled>
+                            </div>
+                        </td>`;
                     } else {
                         html += `<td>${data[i][j] || '-'}</td>`;
                     }
@@ -250,11 +258,11 @@ function renderUangKas(data) {
     }
     
     // Render dari bulan terbaru ke terlama (reverse untuk terbaru di atas)
-    bulanDenganSaldoKumulatif.reverse().forEach((bulanData, idx) => {
+    bulanDenganSaldoKumulatif.reverse().forEach((bulanDataItem, idx) => {
         // Mulai dari saldo kumulatif sebelum bulan ini
-        let saldoBerjalan = saldoSebelumBulan[bulanData.namaBulan];
+        let saldoBerjalan = saldoSebelumBulan[bulanDataItem.namaBulan];
         
-        const rowsHtml = bulanData.transaksi.map(item => {
+        const rowsHtml = bulanDataItem.transaksi.map(item => {
             saldoBerjalan += (item.masuk - item.keluar);
             
             return `
@@ -267,25 +275,30 @@ function renderUangKas(data) {
                 </tr>`;
         }).join('');
         
-        // Tambahkan baris total per bulan (TIDAK menggunakan colspan, tapi cell per cell)
+        // Tambahkan baris total per bulan
         const totalBulanHtml = `
             <tr class="total-row">
-                <td colspan="2" class="font-weight-bold text-right">TOTAL ${bulanData.namaBulan.toUpperCase()}:</td>
-                <td class="font-weight-bold text-success">+${formatNumber(bulanData.totalMasuk)}</td>
-                <td class="font-weight-bold text-danger">-${formatNumber(bulanData.totalKeluar)}</td>
-                <td class="font-weight-bold text-right saldo-kumulatif">Rp ${formatNumber(bulanData.saldoKumulatif)}</td>
+                <td colspan="2" class="font-weight-bold text-right">TOTAL ${bulanDataItem.namaBulan.toUpperCase()}:</td>
+                <td class="font-weight-bold text-success">+${formatNumber(bulanDataItem.totalMasuk)}</td>
+                <td class="font-weight-bold text-danger">-${formatNumber(bulanDataItem.totalKeluar)}</td>
+                <td class="font-weight-bold text-right saldo-kumulatif">Rp ${formatNumber(bulanDataItem.saldoKumulatif)}</td>
             </tr>
         `;
         
         const accDiv = document.createElement('div');
         accDiv.className = `month-accordion ${idx === 0 ? 'active' : ''}`;
         
+        // Header dengan saldo hanya muncul saat accordion aktif (terbuka)
         accDiv.innerHTML = `
-            <div class="accordion-header" onclick="this.parentElement.classList.toggle('active')">
-                <div class="acc-left"><i class="fas fa-calendar-check"></i> <span>${bulanData.namaBulan}</span></div>
+            <div class="accordion-header" onclick="toggleKasAccordion(this)">
+                <div class="acc-left">
+                    <i class="fas fa-calendar-check"></i> 
+                    <span class="month-name">${bulanDataItem.namaBulan}</span>
+                </div>
                 <div class="acc-right">
-                    <span class="label-saldo-header">Saldo Akhir:</span>
-                    <span class="value-saldo-header">Rp ${formatNumber(bulanData.saldoKumulatif)}</span>
+                    <span class="saldo-info ${idx === 0 ? '' : 'hidden'}">
+                        Saldo: <strong class="saldo-value">Rp ${formatNumber(bulanDataItem.saldoKumulatif)}</strong>
+                    </span>
                     <i class="fas fa-chevron-down ml-10"></i>
                 </div>
             </div>
@@ -310,6 +323,30 @@ function renderUangKas(data) {
             </div>`;
         kasContainer.appendChild(accDiv);
     });
+}
+
+// Fungsi untuk toggle accordion di menu kas
+function toggleKasAccordion(headerElement) {
+    const accordion = headerElement.parentElement;
+    const isActive = accordion.classList.contains('active');
+    const saldoInfo = headerElement.querySelector('.saldo-info');
+    
+    // Tutup semua accordion terlebih dahulu
+    document.querySelectorAll('.month-accordion').forEach(acc => {
+        acc.classList.remove('active');
+        const otherSaldoInfo = acc.querySelector('.saldo-info');
+        if (otherSaldoInfo) {
+            otherSaldoInfo.classList.add('hidden');
+        }
+    });
+    
+    // Jika accordion ini sebelumnya tidak aktif, buka
+    if (!isActive) {
+        accordion.classList.add('active');
+        if (saldoInfo) {
+            saldoInfo.classList.remove('hidden');
+        }
+    }
 }
 
 async function exportToPDF() {
@@ -351,12 +388,21 @@ async function exportToPDF() {
         const margin = 20;
         const contentWidth = pageWidth - (2 * margin);
         
-        // Data untuk chart - akan digunakan nanti
+        // Data untuk chart
         const chartData = {
             labels: [],
             pemasukan: [],
             pengeluaran: [],
             saldo: []
+        };
+        
+        // Tentukan lebar kolom (dalam mm)
+        const columnWidths = {
+            tgl: 22,       // Kolom Tgl lebih lebar
+            keterangan: 48, // Kolom Keterangan
+            masuk: 25,     // Kolom Masuk
+            keluar: 25,    // Kolom Keluar
+            saldo: 30      // Kolom Saldo
         };
         
         // Proses setiap bulan dalam urutan kronologis (lama ke baru)
@@ -418,7 +464,7 @@ async function exportToPDF() {
                 `Rp ${formatNumber(globalBalance)}`
             ]);
             
-            // Buat tabel dengan autoTable
+            // Buat tabel dengan autoTable - DENGAN KOLOM YANG LEBIH LEBAR
             doc.autoTable({
                 startY: currentY,
                 head: [['Tanggal', 'Keterangan', 'Masuk', 'Keluar', 'Saldo Kumulatif']],
@@ -432,14 +478,34 @@ async function exportToPDF() {
                 },
                 bodyStyles: { 
                     fontSize: 8,
-                    cellPadding: 3
+                    cellPadding: 3,
+                    overflow: 'linebreak'
                 },
                 columnStyles: {
-                    0: { cellWidth: 20, halign: 'center' },
-                    1: { cellWidth: 50 },
-                    2: { cellWidth: 25, halign: 'right' },
-                    3: { cellWidth: 25, halign: 'right' },
-                    4: { cellWidth: 30, halign: 'right' }
+                    0: { 
+                        cellWidth: columnWidths.tgl, 
+                        halign: 'center',
+                        minCellWidth: columnWidths.tgl - 2
+                    },
+                    1: { 
+                        cellWidth: columnWidths.keterangan,
+                        minCellWidth: columnWidths.keterangan - 3
+                    },
+                    2: { 
+                        cellWidth: columnWidths.masuk, 
+                        halign: 'right',
+                        minCellWidth: columnWidths.masuk - 2
+                    },
+                    3: { 
+                        cellWidth: columnWidths.keluar, 
+                        halign: 'right',
+                        minCellWidth: columnWidths.keluar - 2
+                    },
+                    4: { 
+                        cellWidth: columnWidths.saldo, 
+                        halign: 'right',
+                        minCellWidth: columnWidths.saldo - 2
+                    }
                 },
                 margin: { left: margin, right: margin },
                 willDrawCell: function(data) {
@@ -468,23 +534,30 @@ async function exportToPDF() {
                     // Parse khusus untuk baris total
                     if (data.row.index === tableData.length - 1) {
                         if (data.column.index === 2) {
-                            data.cell.styles.textColor = [6, 214, 160]; // Hijau untuk pemasukan
+                            data.cell.styles.textColor = [6, 214, 160];
                         } else if (data.column.index === 3) {
-                            data.cell.styles.textColor = [239, 71, 111]; // Merah untuk pengeluaran
+                            data.cell.styles.textColor = [239, 71, 111];
                         } else if (data.column.index === 4) {
                             data.cell.styles.fontStyle = 'bold';
                         }
                     }
+                    
+                    // Untuk kolom Tgl, pastikan teks tidak terlalu panjang
+                    if (data.column.index === 0 && data.cell.raw) {
+                        if (data.cell.raw.length > 10) {
+                            data.cell.text = data.cell.raw.substring(0, 10);
+                        }
+                    }
                 },
                 didDrawPage: (d) => { 
-                    currentY = d.cursor.y + 5; // Tambah sedikit spacing
+                    currentY = d.cursor.y + 5;
                 }
             });
             
-            currentY += 10; // Spacing antar bulan
+            currentY += 10;
         }
         
-        // **HALAMAN GRAFIK** - Pastikan kita ada di halaman baru
+        // Halaman baru untuk chart
         doc.addPage();
         currentY = 20;
         
@@ -498,12 +571,11 @@ async function exportToPDF() {
         const canvas1 = document.createElement('canvas');
         canvas1.width = 600;
         canvas1.height = 300;
-        canvas1.style.display = 'none'; // Sembunyikan dari tampilan
+        canvas1.style.display = 'none';
         document.body.appendChild(canvas1);
         
         const ctx1 = canvas1.getContext('2d');
         
-        // Pastikan chartData tidak kosong
         if (chartData.labels.length > 0 && chartData.pemasukan.length > 0) {
             new Chart(ctx1, {
                 type: 'line',
@@ -578,10 +650,8 @@ async function exportToPDF() {
                 }
             });
             
-            // Tunggu sebentar untuk memastikan chart selesai dirender
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            // Convert canvas to image dan tambahkan ke PDF
             const chartImage1 = canvas1.toDataURL('image/png', 1.0);
             doc.addImage(chartImage1, 'PNG', margin, currentY, contentWidth, 80);
             currentY += 90;
@@ -664,7 +734,6 @@ async function exportToPDF() {
                 }
             });
             
-            // Tunggu sebentar untuk memastikan chart selesai dirender
             await new Promise(resolve => setTimeout(resolve, 500));
             
             const chartImage2 = canvas2.toDataURL('image/png', 1.0);
@@ -676,7 +745,7 @@ async function exportToPDF() {
         if (canvas1.parentNode) document.body.removeChild(canvas1);
         if (canvas2.parentNode) document.body.removeChild(canvas2);
         
-        // Summary akhir di halaman yang sama dengan chart
+        // Summary akhir
         currentY += 10;
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
@@ -689,20 +758,16 @@ async function exportToPDF() {
         doc.setFont(undefined, 'normal');
         doc.setFontSize(10);
         
-        // Buat box untuk ringkasan
         const summaryWidth = contentWidth;
         const summaryHeight = 25;
         
-        // Background untuk ringkasan
         doc.setFillColor(245, 245, 245);
         doc.rect(margin, currentY, summaryWidth, summaryHeight, 'F');
         
-        // Border
         doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(0.3);
         doc.rect(margin, currentY, summaryWidth, summaryHeight);
         
-        // Isi ringkasan
         const col1 = margin + 10;
         const col2 = margin + summaryWidth / 2;
         
@@ -730,6 +795,7 @@ async function exportToPDF() {
         showLoading(false); 
     }
 }
+
 function exportToExcel() {
     if (rawKasData.length === 0) return alert("Tunggu data kas dimuat!");
     const ws = XLSX.utils.aoa_to_sheet(rawKasData);
@@ -824,32 +890,24 @@ async function exportRondaPDF() {
         doc.text(`Perumahan E-Murai - Dicetak: ${moment().format('DD MMMM YYYY HH:mm')}`, 105, 28, { align: 'center' });
         
         // Data ronda (asumsi format CSV: header di baris 0, data mulai baris 1)
-        const headers = rawRondaData[0]; // Nama kolom: Nama, Tanggal1, Tanggal2, ...
-        const dataRows = rawRondaData.slice(1); // Data warga
+        const headers = rawRondaData[0];
+        const dataRows = rawRondaData.slice(1);
         
-        // Hilangkan kolom "Nama" dari headers tanggal
-        const dateHeaders = headers.slice(1); // Ambil semua header kecuali "Nama"
-        
-        // Konversi format data untuk lebih mudah diproses
-        // Struktur: { tanggal: "13 Desember 2025", warga: ["Kevin", "Masykur", "Yoga", ...] }
+        const dateHeaders = headers.slice(1);
         const jadwalPerTanggal = [];
         
-        // Untuk setiap kolom tanggal (setelah kolom Nama)
         dateHeaders.forEach((tanggal, colIndex) => {
             const wargaBertugas = [];
             
-            // Cek setiap warga untuk tanggal ini
             dataRows.forEach((row, rowIndex) => {
-                const namaWarga = row[0]; // Nama dari kolom pertama
-                const statusRonda = row[colIndex + 1]; // Status ronda di tanggal tertentu (+1 karena kolom pertama adalah nama)
+                const namaWarga = row[0];
+                const statusRonda = row[colIndex + 1];
                 
-                // Jika TRUE atau ada nilai tertentu (sesuaikan dengan format data Anda)
                 if (statusRonda && statusRonda.toString().toUpperCase() === 'TRUE') {
                     wargaBertugas.push(`${rowIndex + 1}. ${namaWarga}`);
                 }
             });
             
-            // Hanya tambahkan jika ada warga yang bertugas di tanggal ini
             if (wargaBertugas.length > 0) {
                 jadwalPerTanggal.push({
                     tanggal: tanggal,
@@ -863,24 +921,19 @@ async function exportRondaPDF() {
         const margin = 20;
         const contentWidth = pageWidth - (2 * margin);
         
-        // Jika tidak ada data jadwal
         if (jadwalPerTanggal.length === 0) {
             doc.setFontSize(14);
             doc.text("Tidak ada data jadwal ronda yang ditemukan.", margin, currentY);
             currentY += 20;
         } else {
-            // Tampilkan jadwal per tanggal
             jadwalPerTanggal.forEach((jadwal, index) => {
-                // Cek jika perlu halaman baru
                 if (currentY > 250) {
                     doc.addPage();
                     currentY = 20;
                 }
                 
-                // Format tanggal lebih baik
                 let formattedDate = jadwal.tanggal;
                 try {
-                    // Coba parsing tanggal jika dalam format tertentu
                     const dateMoment = moment(jadwal.tanggal, 'DD/MM/YYYY');
                     if (dateMoment.isValid()) {
                         formattedDate = dateMoment.format('DD MMMM YYYY');
@@ -889,13 +942,11 @@ async function exportRondaPDF() {
                     // Jika gagal parsing, gunakan tanggal asli
                 }
                 
-                // Judul tanggal
                 doc.setFontSize(14);
                 doc.setFont(undefined, 'bold');
                 doc.text(`Jadwal Ronda ${formattedDate}:`, margin, currentY);
                 currentY += 8;
                 
-                // List warga yang bertugas
                 doc.setFontSize(12);
                 doc.setFont(undefined, 'normal');
                 
@@ -904,17 +955,15 @@ async function exportRondaPDF() {
                     currentY += 7;
                 });
                 
-                currentY += 10; // Spasi antar tanggal
+                currentY += 10;
             });
         }
         
-        // Footer
         doc.setFontSize(10);
         doc.setFont(undefined, 'italic');
         doc.text(`Total ${jadwalPerTanggal.length} hari jadwal ronda tercatat`, 105, 280, { align: 'center' });
         doc.text(`© E-MURAI ${new Date().getFullYear()}`, 105, 285, { align: 'center' });
         
-        // Simpan file
         doc.save(`Jadwal_Ronda_EMurai_${moment().format('YYYYMMDD')}.pdf`);
         
     } catch (err) { 
