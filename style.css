@@ -135,10 +135,11 @@ body {
     gap: var(--spacing-sm);
     letter-spacing: -0.3px;
     white-space: nowrap; /* Mencegah tulisan jadi 2 baris */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 60%; /* Batasi lebar agar tidak overlap */
+    overflow: visible; /* Ubah dari hidden menjadi visible */
+    text-overflow: clip; /* Ubah dari ellipsis menjadi clip */
+    max-width: none; /* Hapus batasan lebar */
     padding-right: var(--spacing-sm);
+    flex-shrink: 0; /* Mencegah logo menyusut */
 }
 
 .header-content h1 i {
