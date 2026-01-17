@@ -909,6 +909,7 @@ async function exportRondaPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
         
+        // --- HALAMAN 1: JADWAL RONDA PER TANGGAL ---
         doc.setFontSize(20);
         doc.setFont(undefined, 'bold');
         doc.text("LAPORAN JADWAL RONDA", 105, 20, { align: 'center' });
@@ -986,12 +987,259 @@ async function exportRondaPDF() {
             });
         }
         
-        doc.setFontSize(10);
-        doc.setFont(undefined, 'italic');
-        doc.text(`Total ${jadwalPerTanggal.length} hari jadwal ronda tercatat`, 105, 280, { align: 'center' });
-        doc.text(`© System Management Gang Murai ${new Date().getFullYear()}`, 105, 285, { align: 'center' });
+        // --- HALAMAN 2: REKAP RONDA PER BULAN ---
+        doc.addPage();
+        currentY = 20;
         
-        doc.save(`Jadwal_Ronda_EMurai_${moment().format('YYYYMMDD')}.pdf`);
+        doc.setFontSize(20);
+        doc.setFont(undefined, 'bold');
+        doc.text("REKAP KEIKUTSERTAAN RONDA 2026", 105, currentY, { align: 'center' });
+        currentY += 12;
+        
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'normal');
+        doc.text("Jumlah Kehadiran Ronda per Warga per Bulan", 105, currentY, { align: 'center' });
+        currentY += 15;
+        
+        // Buat struktur data rekap per bulan
+        const bulanIndonesia = [
+            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        ];
+        
+        // Inisialisasi struktur data
+        const rekapData = {};
+        
+        // Inisialisasi untuk setiap warga
+        dataRows.forEach(row => {
+            const namaWarga = row[0];
+            rekapData[namaWarga] = {
+                nama: namaWarga,
+                perBulan: {},
+                total: 0
+            };
+            
+            // Inisialisasi 0 untuk semua bulan
+            bulanIndonesia.forEach(bulan => {
+                rekapData[namaWarga].perBulan[bulan] = 0;
+            });
+        });
+        
+        // Proses data per tanggal
+        dateHeaders.forEach((tanggalStr, colIndex) => {
+            // Coba parse tanggal untuk dapatkan bulan
+            let bulan = '';
+            try {
+                // Format tanggal: DD/MM/YYYY
+                const parts = tanggalStr.split('/');
+                if (parts.length === 3) {
+                    const bulanIndex = parseInt(parts[1]) - 1; // MM adalah indeks 1
+                    if (bulanIndex >= 0 && bulanIndex < 12) {
+                        bulan = bulanIndonesia[bulanIndex];
+                    }
+                }
+            } catch (e) {
+                console.error("Error parsing tanggal:", tanggalStr, e);
+            }
+            
+            if (!bulan) return; // Skip jika tidak bisa parse bulan
+            
+            // Hitung kehadiran untuk tanggal ini
+            dataRows.forEach(row => {
+                const namaWarga = row[0];
+                const statusRonda = row[colIndex + 1];
+                
+                if (statusRonda && statusRonda.toString().toUpperCase() === 'TRUE') {
+                    rekapData[namaWarga].perBulan[bulan] = (rekapData[namaWarga].perBulan[bulan] || 0) + 1;
+                    rekapData[namaWarga].total += 1;
+                }
+            });
+        });
+        
+        // Konversi ke array untuk tabel
+        const rekapArray = Object.values(rekapData);
+        
+        // Buat header tabel
+        const tableHeaders = ['Nama Warga', ...bulanIndonesia, 'Total'];
+        
+        // Buat data tabel
+        const tableData = rekapArray.map(warga => {
+            const rowData = [warga.nama];
+            
+            bulanIndonesia.forEach(bulan => {
+                rowData.push(warga.perBulan[bulan] || 0);
+            });
+            
+            rowData.push(warga.total);
+            return rowData;
+        });
+        
+        // Urutkan berdasarkan total tertinggi
+        tableData.sort((a, b) => {
+            const totalA = a[a.length - 1];
+            const totalB = b[b.length - 1];
+            return totalB - totalA;
+        });
+        
+        // Hitung total per bulan (baris terakhir)
+        const totalPerBulan = Array(bulanIndonesia.length).fill(0);
+        let grandTotal = 0;
+        
+        tableData.forEach(row => {
+            for (let i = 0; i < bulanIndonesia.length; i++) {
+                totalPerBulan[i] += row[i + 1]; // i+1 karena kolom pertama adalah nama
+            }
+            grandTotal += row[row.length - 1];
+        });
+        
+        // Tambahkan baris total
+        const totalRow = ['TOTAL', ...totalPerBulan, grandTotal];
+        
+        // Buat tabel dengan jsPDF autotable
+        doc.autoTable({
+            startY: currentY,
+            head: [tableHeaders],
+            body: tableData,
+            foot: [totalRow],
+            theme: 'grid',
+            headStyles: { 
+                fillColor: [67, 97, 238], 
+                fontSize: 9,
+                textColor: [255, 255, 255],
+                halign: 'center',
+                fontStyle: 'bold'
+            },
+            bodyStyles: { 
+                fontSize: 8,
+                cellPadding: 3,
+                textColor: [0, 0, 0]
+            },
+            footStyles: {
+                fillColor: [6, 214, 160],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                fontSize: 9
+            },
+            columnStyles: {
+                0: { 
+                    cellWidth: 40,
+                    halign: 'left'
+                },
+                // Kolom bulan (Januari-Desember)
+                ...bulanIndonesia.reduce((styles, bulan, index) => {
+                    styles[index + 1] = { 
+                        cellWidth: 12,
+                        halign: 'center'
+                    };
+                    return styles;
+                }, {}),
+                // Kolom Total
+                [tableHeaders.length - 1]: { 
+                    cellWidth: 15,
+                    halign: 'center',
+                    fontStyle: 'bold'
+                }
+            },
+            margin: { left: margin, right: margin },
+            didDrawPage: function(data) {
+                currentY = data.cursor.y + 10;
+            }
+        });
+        
+        // --- HALAMAN 3: STATISTIK RONDA (Opsional) ---
+        doc.addPage();
+        currentY = 20;
+        
+        doc.setFontSize(18);
+        doc.setFont(undefined, 'bold');
+        doc.text("STATISTIK RONDA TAHUN 2026", 105, currentY, { align: 'center' });
+        currentY += 15;
+        
+        // Hitung statistik
+        const totalHariRonda = jadwalPerTanggal.length;
+        const totalKehadiran = grandTotal;
+        const rataKehadiranPerHari = totalHariRonda > 0 ? (totalKehadiran / totalHariRonda).toFixed(1) : 0;
+        
+        const kehadiranPerBulan = totalPerBulan;
+        const bulanTerbanyakIndex = kehadiranPerBulan.indexOf(Math.max(...kehadiranPerBulan));
+        const bulanTerbanyak = bulanIndonesia[bulanTerbanyakIndex];
+        
+        // Statistik per warga
+        const rataKehadiranPerWarga = (totalKehadiran / rekapArray.length).toFixed(1);
+        
+        // Warga dengan kehadiran terbanyak
+        const wargaTerbanyak = tableData.length > 0 ? tableData[0][0] : '-';
+        const kehadiranTerbanyak = tableData.length > 0 ? tableData[0][tableData[0].length - 1] : 0;
+        
+        // Tampilkan statistik
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text("Ringkasan Statistik:", margin, currentY);
+        currentY += 10;
+        
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(10);
+        
+        const statData = [
+            [`Total Hari Ronda:`, `${totalHariRonda} hari`],
+            [`Total Kehadiran:`, `${totalKehadiran} kali`],
+            [`Rata-rata Kehadiran per Hari:`, `${rataKehadiranPerHari} warga`],
+            [`Rata-rata Kehadiran per Warga:`, `${rataKehadiranPerWarga} kali`],
+            [`Bulan dengan Ronda Terbanyak:`, `${bulanTerbanyak} (${kehadiranPerBulan[bulanTerbanyakIndex]} kali)`],
+            [`Warga dengan Kehadiran Terbanyak:`, `${wargaTerbanyak} (${kehadiranTerbanyak} kali)`]
+        ];
+        
+        statData.forEach(([label, value], index) => {
+            doc.text(label, margin + 10, currentY);
+            doc.text(value, margin + 80, currentY);
+            currentY += 8;
+        });
+        
+        currentY += 10;
+        
+        // Buat chart sederhana (horizontal bar) untuk kehadiran per bulan
+        if (kehadiranPerBulan.some(val => val > 0)) {
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text("Grafik Kehadiran Ronda per Bulan:", margin, currentY);
+            currentY += 10;
+            
+            const maxKehadiran = Math.max(...kehadiranPerBulan);
+            const barWidth = 100; // Lebar maksimal bar
+            
+            bulanIndonesia.forEach((bulan, index) => {
+                const kehadiran = kehadiranPerBulan[index];
+                if (kehadiran === 0) return;
+                
+                const barLength = (kehadiran / maxKehadiran) * barWidth;
+                
+                doc.setFontSize(9);
+                doc.text(bulan.substring(0, 3), margin, currentY + 4);
+                
+                // Bar background
+                doc.setFillColor(230, 230, 230);
+                doc.rect(margin + 25, currentY, barWidth, 6, 'F');
+                
+                // Bar fill
+                doc.setFillColor(67, 97, 238);
+                doc.rect(margin + 25, currentY, barLength, 6, 'F');
+                
+                // Text value
+                doc.setTextColor(0, 0, 0);
+                doc.text(`${kehadiran}`, margin + 25 + barWidth + 5, currentY + 4);
+                
+                currentY += 10;
+            });
+        }
+        
+        // Footer
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'italic');
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Laporan dicetak otomatis oleh Sistem E-MURAI`, 105, 285, { align: 'center' });
+        doc.text(`© System Management Gang Murai ${new Date().getFullYear()}`, 105, 290, { align: 'center' });
+        
+        doc.save(`Laporan_Ronda_EMurai_${moment().format('YYYYMMDD')}.pdf`);
         
     } catch (err) { 
         console.error("Error generating PDF:", err);
