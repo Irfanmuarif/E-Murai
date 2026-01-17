@@ -909,97 +909,21 @@ async function exportRondaPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
         
-        // --- HALAMAN 1: JADWAL RONDA PER TANGGAL ---
+        // --- HALAMAN 1: REKAP RONDA PER BULAN (PALING ATAS) ---
         doc.setFontSize(20);
         doc.setFont(undefined, 'bold');
-        doc.text("LAPORAN JADWAL RONDA", 105, 20, { align: 'center' });
+        doc.text("REKAP RONDA 2026", 105, 15, { align: 'center' });
         
         doc.setFontSize(12);
         doc.setFont(undefined, 'normal');
-        doc.text(`System Management Gang Murai - Dicetak: ${moment().format('DD MMMM YYYY HH:mm')}`, 105, 28, { align: 'center' });
+        doc.text(`System Management Gang Murai - Dicetak: ${moment().format('DD MMMM YYYY HH:mm')}`, 105, 22, { align: 'center' });
         
         const headers = rawRondaData[0];
         const dataRows = rawRondaData.slice(1);
         
-        const dateHeaders = headers.slice(1);
-        const jadwalPerTanggal = [];
-        
-        dateHeaders.forEach((tanggal, colIndex) => {
-            const wargaBertugas = [];
-            
-            dataRows.forEach((row, rowIndex) => {
-                const namaWarga = row[0];
-                const statusRonda = row[colIndex + 1];
-                
-                if (statusRonda && statusRonda.toString().toUpperCase() === 'TRUE') {
-                    wargaBertugas.push(`${rowIndex + 1}. ${namaWarga}`);
-                }
-            });
-            
-            if (wargaBertugas.length > 0) {
-                jadwalPerTanggal.push({
-                    tanggal: tanggal,
-                    warga: wargaBertugas
-                });
-            }
-        });
-        
-        let currentY = 40;
-        const pageWidth = doc.internal.pageSize.width;
-        const margin = 20;
-        const contentWidth = pageWidth - (2 * margin);
-        
-        if (jadwalPerTanggal.length === 0) {
-            doc.setFontSize(14);
-            doc.text("Tidak ada data jadwal ronda yang ditemukan.", margin, currentY);
-            currentY += 20;
-        } else {
-            jadwalPerTanggal.forEach((jadwal, index) => {
-                if (currentY > 250) {
-                    doc.addPage();
-                    currentY = 20;
-                }
-                
-                let formattedDate = jadwal.tanggal;
-                try {
-                    const dateMoment = moment(jadwal.tanggal, 'DD/MM/YYYY');
-                    if (dateMoment.isValid()) {
-                        formattedDate = dateMoment.format('DD MMMM YYYY');
-                    }
-                } catch (e) {
-                    // Jika gagal parsing, gunakan tanggal asli
-                }
-                
-                doc.setFontSize(14);
-                doc.setFont(undefined, 'bold');
-                doc.text(`Jadwal Ronda ${formattedDate}:`, margin, currentY);
-                currentY += 8;
-                
-                doc.setFontSize(12);
-                doc.setFont(undefined, 'normal');
-                
-                jadwal.warga.forEach((namaWarga, idx) => {
-                    doc.text(namaWarga, margin + 10, currentY);
-                    currentY += 7;
-                });
-                
-                currentY += 10;
-            });
-        }
-        
-        // --- HALAMAN 2: REKAP RONDA PER BULAN ---
-        doc.addPage();
-        currentY = 20;
-        
-        doc.setFontSize(20);
-        doc.setFont(undefined, 'bold');
-        doc.text("REKAP KEIKUTSERTAAN RONDA 2026", 105, currentY, { align: 'center' });
-        currentY += 12;
-        
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'normal');
-        doc.text("Jumlah Kehadiran Ronda per Warga per Bulan", 105, currentY, { align: 'center' });
-        currentY += 15;
+        // DEBUG: Tampilkan data untuk memeriksa struktur
+        console.log("Headers:", headers);
+        console.log("Data rows:", dataRows.slice(0, 3));
         
         // Buat struktur data rekap per bulan
         const bulanIndonesia = [
@@ -1013,8 +937,10 @@ async function exportRondaPDF() {
         // Inisialisasi untuk setiap warga
         dataRows.forEach(row => {
             const namaWarga = row[0];
+            if (!namaWarga) return;
+            
             rekapData[namaWarga] = {
-                nama: namaWarga,
+                nama: namaWarga.trim(),
                 perBulan: {},
                 total: 0
             };
@@ -1025,221 +951,360 @@ async function exportRondaPDF() {
             });
         });
         
-        // Proses data per tanggal
+        console.log("Jumlah warga:", Object.keys(rekapData).length);
+        
+        // Proses data per tanggal (mulai dari kolom 1 karena kolom 0 adalah nama)
+        const dateHeaders = headers.slice(1);
+        console.log("Tanggal headers:", dateHeaders.slice(0, 5));
+        
         dateHeaders.forEach((tanggalStr, colIndex) => {
-            // Coba parse tanggal untuk dapatkan bulan
+            // Coba parse tanggal dengan berbagai format
             let bulan = '';
-            try {
-                // Format tanggal: DD/MM/YYYY
-                const parts = tanggalStr.split('/');
-                if (parts.length === 3) {
-                    const bulanIndex = parseInt(parts[1]) - 1; // MM adalah indeks 1
-                    if (bulanIndex >= 0 && bulanIndex < 12) {
-                        bulan = bulanIndonesia[bulanIndex];
-                    }
-                }
-            } catch (e) {
-                console.error("Error parsing tanggal:", tanggalStr, e);
+            let tanggalMoment = null;
+            
+            // Coba format DD/MM/YYYY
+            tanggalMoment = moment(tanggalStr, 'DD/MM/YYYY');
+            
+            // Jika tidak valid, coba format lain
+            if (!tanggalMoment.isValid()) {
+                tanggalMoment = moment(tanggalStr, 'DD-MM-YYYY');
+            }
+            if (!tanggalMoment.isValid()) {
+                tanggalMoment = moment(tanggalStr, 'YYYY-MM-DD');
+            }
+            if (!tanggalMoment.isValid()) {
+                // Coba parsing langsung jika format standar
+                tanggalMoment = moment(tanggalStr);
             }
             
-            if (!bulan) return; // Skip jika tidak bisa parse bulan
+            if (tanggalMoment.isValid()) {
+                const bulanIndex = tanggalMoment.month(); // 0-11 (Jan=0)
+                if (bulanIndex >= 0 && bulanIndex < 12) {
+                    bulan = bulanIndonesia[bulanIndex];
+                }
+            } else {
+                console.log("Tanggal tidak valid:", tanggalStr);
+                // Coba ekstrak bulan dari string secara manual
+                const lowerStr = tanggalStr.toLowerCase();
+                bulanIndonesia.forEach((bulanName, idx) => {
+                    if (lowerStr.includes(bulanName.toLowerCase())) {
+                        bulan = bulanName;
+                    }
+                });
+            }
+            
+            if (!bulan) {
+                console.log(`Tidak bisa menentukan bulan untuk: "${tanggalStr}"`);
+                return; // Skip jika tidak bisa parse bulan
+            }
+            
+            // DEBUG: Tampilkan parsing untuk beberapa tanggal pertama
+            if (colIndex < 3) {
+                console.log(`Tanggal: "${tanggalStr}" -> Bulan: ${bulan}`);
+            }
             
             // Hitung kehadiran untuk tanggal ini
             dataRows.forEach(row => {
                 const namaWarga = row[0];
-                const statusRonda = row[colIndex + 1];
+                if (!namaWarga || !rekapData[namaWarga]) return;
                 
-                if (statusRonda && statusRonda.toString().toUpperCase() === 'TRUE') {
+                const statusRonda = row[colIndex + 1]; // +1 karena kolom 0 adalah nama
+                const statusStr = statusRonda ? statusRonda.toString().toUpperCase() : '';
+                
+                // Cek berbagai kemungkinan format true
+                if (statusStr === 'TRUE' || statusStr === 'YA' || statusStr === '1' || statusStr === '✓') {
                     rekapData[namaWarga].perBulan[bulan] = (rekapData[namaWarga].perBulan[bulan] || 0) + 1;
                     rekapData[namaWarga].total += 1;
+                    
+                    if (colIndex < 2 && rowIndex < 2) {
+                        console.log(`  ${namaWarga}: TRUE di ${bulan}`);
+                    }
                 }
             });
         });
         
         // Konversi ke array untuk tabel
         const rekapArray = Object.values(rekapData);
+        console.log("Data rekap:", rekapArray.slice(0, 3));
         
         // Buat header tabel
         const tableHeaders = ['Nama Warga', ...bulanIndonesia, 'Total'];
         
         // Buat data tabel
-        const tableData = rekapArray.map(warga => {
-            const rowData = [warga.nama];
+        const tableData = rekapArray
+            .filter(warga => warga.nama && warga.nama.trim() !== '')
+            .map(warga => {
+                const rowData = [warga.nama];
+                
+                bulanIndonesia.forEach(bulan => {
+                    rowData.push(warga.perBulan[bulan] || 0);
+                });
+                
+                rowData.push(warga.total);
+                return rowData;
+            })
+            .filter(row => row.some((cell, idx) => idx > 0 && cell > 0)); // Hanya tampilkan yang punya kehadiran > 0
+        
+        console.log("Jumlah baris data:", tableData.length);
+        
+        // Jika tidak ada data sama sekali, tampilkan pesan
+        if (tableData.length === 0) {
+            let currentY = 40;
+            doc.setFontSize(14);
+            doc.text("Tidak ada data kehadiran ronda ditemukan.", 20, currentY);
+            currentY += 20;
             
-            bulanIndonesia.forEach(bulan => {
-                rowData.push(warga.perBulan[bulan] || 0);
+            // Tampilkan data mentah untuk debugging
+            doc.setFontSize(10);
+            doc.text("Data mentah (5 baris pertama):", 20, currentY);
+            currentY += 8;
+            
+            dataRows.slice(0, 5).forEach((row, idx) => {
+                const displayText = `${idx + 1}. ${row[0]}: ${row.slice(1, 4).join(', ')}...`;
+                if (currentY < 280) {
+                    doc.text(displayText, 25, currentY);
+                    currentY += 6;
+                }
+            });
+        } else {
+            // Urutkan berdasarkan total tertinggi
+            tableData.sort((a, b) => {
+                const totalA = a[a.length - 1];
+                const totalB = b[b.length - 1];
+                return totalB - totalA;
             });
             
-            rowData.push(warga.total);
-            return rowData;
-        });
-        
-        // Urutkan berdasarkan total tertinggi
-        tableData.sort((a, b) => {
-            const totalA = a[a.length - 1];
-            const totalB = b[b.length - 1];
-            return totalB - totalA;
-        });
-        
-        // Hitung total per bulan (baris terakhir)
-        const totalPerBulan = Array(bulanIndonesia.length).fill(0);
-        let grandTotal = 0;
-        
-        tableData.forEach(row => {
-            for (let i = 0; i < bulanIndonesia.length; i++) {
-                totalPerBulan[i] += row[i + 1]; // i+1 karena kolom pertama adalah nama
-            }
-            grandTotal += row[row.length - 1];
-        });
-        
-        // Tambahkan baris total
-        const totalRow = ['TOTAL', ...totalPerBulan, grandTotal];
-        
-        // Buat tabel dengan jsPDF autotable
-        doc.autoTable({
-            startY: currentY,
-            head: [tableHeaders],
-            body: tableData,
-            foot: [totalRow],
-            theme: 'grid',
-            headStyles: { 
-                fillColor: [67, 97, 238], 
-                fontSize: 9,
-                textColor: [255, 255, 255],
-                halign: 'center',
-                fontStyle: 'bold'
-            },
-            bodyStyles: { 
-                fontSize: 8,
-                cellPadding: 3,
-                textColor: [0, 0, 0]
-            },
-            footStyles: {
-                fillColor: [6, 214, 160],
-                textColor: [0, 0, 0],
-                fontStyle: 'bold',
-                fontSize: 9
-            },
-            columnStyles: {
-                0: { 
-                    cellWidth: 40,
-                    halign: 'left'
-                },
-                // Kolom bulan (Januari-Desember)
-                ...bulanIndonesia.reduce((styles, bulan, index) => {
-                    styles[index + 1] = { 
-                        cellWidth: 12,
-                        halign: 'center'
-                    };
-                    return styles;
-                }, {}),
-                // Kolom Total
-                [tableHeaders.length - 1]: { 
-                    cellWidth: 15,
-                    halign: 'center',
-                    fontStyle: 'bold'
+            // Hitung total per bulan (untuk baris terakhir jika diinginkan)
+            const totalPerBulan = Array(bulanIndonesia.length).fill(0);
+            let grandTotal = 0;
+            
+            tableData.forEach(row => {
+                for (let i = 0; i < bulanIndonesia.length; i++) {
+                    totalPerBulan[i] += row[i + 1]; // i+1 karena kolom pertama adalah nama
                 }
-            },
-            margin: { left: margin, right: margin },
-            didDrawPage: function(data) {
-                currentY = data.cursor.y + 10;
-            }
-        });
-        
-        // --- HALAMAN 3: STATISTIK RONDA (Opsional) ---
-        doc.addPage();
-        currentY = 20;
-        
-        doc.setFontSize(18);
-        doc.setFont(undefined, 'bold');
-        doc.text("STATISTIK RONDA TAHUN 2026", 105, currentY, { align: 'center' });
-        currentY += 15;
-        
-        // Hitung statistik
-        const totalHariRonda = jadwalPerTanggal.length;
-        const totalKehadiran = grandTotal;
-        const rataKehadiranPerHari = totalHariRonda > 0 ? (totalKehadiran / totalHariRonda).toFixed(1) : 0;
-        
-        const kehadiranPerBulan = totalPerBulan;
-        const bulanTerbanyakIndex = kehadiranPerBulan.indexOf(Math.max(...kehadiranPerBulan));
-        const bulanTerbanyak = bulanIndonesia[bulanTerbanyakIndex];
-        
-        // Statistik per warga
-        const rataKehadiranPerWarga = (totalKehadiran / rekapArray.length).toFixed(1);
-        
-        // Warga dengan kehadiran terbanyak
-        const wargaTerbanyak = tableData.length > 0 ? tableData[0][0] : '-';
-        const kehadiranTerbanyak = tableData.length > 0 ? tableData[0][tableData[0].length - 1] : 0;
-        
-        // Tampilkan statistik
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text("Ringkasan Statistik:", margin, currentY);
-        currentY += 10;
-        
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(10);
-        
-        const statData = [
-            [`Total Hari Ronda:`, `${totalHariRonda} hari`],
-            [`Total Kehadiran:`, `${totalKehadiran} kali`],
-            [`Rata-rata Kehadiran per Hari:`, `${rataKehadiranPerHari} warga`],
-            [`Rata-rata Kehadiran per Warga:`, `${rataKehadiranPerWarga} kali`],
-            [`Bulan dengan Ronda Terbanyak:`, `${bulanTerbanyak} (${kehadiranPerBulan[bulanTerbanyakIndex]} kali)`],
-            [`Warga dengan Kehadiran Terbanyak:`, `${wargaTerbanyak} (${kehadiranTerbanyak} kali)`]
-        ];
-        
-        statData.forEach(([label, value], index) => {
-            doc.text(label, margin + 10, currentY);
-            doc.text(value, margin + 80, currentY);
-            currentY += 8;
-        });
-        
-        currentY += 10;
-        
-        // Buat chart sederhana (horizontal bar) untuk kehadiran per bulan
-        if (kehadiranPerBulan.some(val => val > 0)) {
-            doc.setFontSize(12);
-            doc.setFont(undefined, 'bold');
-            doc.text("Grafik Kehadiran Ronda per Bulan:", margin, currentY);
-            currentY += 10;
+                grandTotal += row[row.length - 1];
+            });
             
-            const maxKehadiran = Math.max(...kehadiranPerBulan);
-            const barWidth = 100; // Lebar maksimal bar
+            // Atur ukuran kolom yang lebih rapat
+            const margin = 8; // Margin lebih kecil
+            const pageWidth = doc.internal.pageSize.width;
+            const usableWidth = pageWidth - (2 * margin);
             
-            bulanIndonesia.forEach((bulan, index) => {
-                const kehadiran = kehadiranPerBulan[index];
-                if (kehadiran === 0) return;
+            // Hitung lebar kolom
+            const namaColWidth = 35; // Lebar kolom nama
+            const bulanColWidth = 9; // Lebar kolom bulan (lebih kecil)
+            const totalColWidth = 12; // Lebar kolom total
+            
+            // Buat tabel dengan jsPDF autotable
+            doc.autoTable({
+                startY: 35,
+                head: [tableHeaders],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { 
+                    fillColor: [67, 97, 238], 
+                    fontSize: 7, // Lebih kecil
+                    textColor: [255, 255, 255],
+                    halign: 'center',
+                    fontStyle: 'bold',
+                    cellPadding: 2 // Padding lebih kecil
+                },
+                bodyStyles: { 
+                    fontSize: 7, // Lebih kecil
+                    cellPadding: 2,
+                    textColor: [0, 0, 0],
+                    overflow: 'linebreak',
+                    minCellHeight: 5 // Tinggi sel minimal
+                },
+                columnStyles: {
+                    // Kolom nama
+                    0: { 
+                        cellWidth: namaColWidth,
+                        halign: 'left',
+                        valign: 'middle'
+                    },
+                    // Kolom bulan (Januari-Desember)
+                    ...bulanIndonesia.reduce((styles, bulan, index) => {
+                        styles[index + 1] = { 
+                            cellWidth: bulanColWidth,
+                            halign: 'center',
+                            valign: 'middle'
+                        };
+                        return styles;
+                    }, {}),
+                    // Kolom Total
+                    [tableHeaders.length - 1]: { 
+                        cellWidth: totalColWidth,
+                        halign: 'center',
+                        valign: 'middle',
+                        fontStyle: 'bold'
+                    }
+                },
+                margin: { left: margin, right: margin },
+                tableWidth: 'auto',
+                styles: {
+                    overflow: 'linebreak',
+                    cellWidth: 'wrap'
+                },
+                didParseCell: function(data) {
+                    // Jika ini sel data (bukan header)
+                    if (data.row.index >= 0 && data.column.index >= 0) {
+                        // Untuk sel total (kolom terakhir), beri background jika > 0
+                        if (data.column.index === tableHeaders.length - 1 && data.cell.raw > 0) {
+                            data.cell.styles.fillColor = [230, 255, 247]; // Hijau muda
+                        }
+                        // Untuk sel bulan dengan nilai > 0, beri background
+                        else if (data.column.index > 0 && data.column.index < tableHeaders.length - 1 && data.cell.raw > 0) {
+                            data.cell.styles.fillColor = [240, 248, 255]; // Biru muda
+                        }
+                    }
+                },
+                didDrawPage: function(data) {
+                    // Tambahkan total di samping judul
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`Total Kehadiran: ${grandTotal} kali`, pageWidth - 40, 15);
+                    
+                    // Tambahkan jumlah warga
+                    doc.setFontSize(9);
+                    doc.setFont(undefined, 'normal');
+                    doc.text(`Jumlah Warga: ${tableData.length} orang`, pageWidth - 40, 22);
+                }
+            });
+            
+            // Tambahkan halaman baru untuk jadwal detail jika masih ada ruang
+            const lastY = doc.lastAutoTable.finalY || 180;
+            if (lastY < 240) {
+                currentY = lastY + 15;
                 
-                const barLength = (kehadiran / maxKehadiran) * barWidth;
+                // --- HALAMAN 1 LANJUTAN: STATISTIK SINGKAT ---
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text("Statistik Singkat:", margin, currentY);
+                currentY += 8;
                 
                 doc.setFontSize(9);
-                doc.text(bulan.substring(0, 3), margin, currentY + 4);
+                doc.setFont(undefined, 'normal');
                 
-                // Bar background
-                doc.setFillColor(230, 230, 230);
-                doc.rect(margin + 25, currentY, barWidth, 6, 'F');
+                // Hitung statistik
+                const wargaTerbanyak = tableData.length > 0 ? tableData[0][0] : '-';
+                const kehadiranTerbanyak = tableData.length > 0 ? tableData[0][tableData[0].length - 1] : 0;
+                const rataKehadiran = (grandTotal / tableData.length).toFixed(1);
                 
-                // Bar fill
-                doc.setFillColor(67, 97, 238);
-                doc.rect(margin + 25, currentY, barLength, 6, 'F');
+                const bulanTerbanyakIndex = totalPerBulan.indexOf(Math.max(...totalPerBulan));
+                const bulanTerbanyak = bulanIndonesia[bulanTerbanyakIndex];
+                const kehadiranBulanTerbanyak = totalPerBulan[bulanTerbanyakIndex];
                 
-                // Text value
-                doc.setTextColor(0, 0, 0);
-                doc.text(`${kehadiran}`, margin + 25 + barWidth + 5, currentY + 4);
+                const statData = [
+                    [`Rata-rata kehadiran:`, `${rataKehadiran} kali per warga`],
+                    [`Warga paling aktif:`, `${wargaTerbanyak} (${kehadiranTerbanyak} kali)`],
+                    [`Bulan paling aktif:`, `${bulanTerbanyak} (${kehadiranBulanTerbanyak} kali)`],
+                    [`Total hari ronda:`, `${dateHeaders.length} hari`]
+                ];
                 
+                statData.forEach(([label, value], index) => {
+                    doc.text(label, margin + 5, currentY);
+                    doc.text(value, margin + 50, currentY);
+                    currentY += 6;
+                });
+            }
+            
+            // --- HALAMAN 2: JADWAL RONDA PER TANGGAL (Jika perlu) ---
+            if (dateHeaders.length > 0) {
+                doc.addPage();
+                currentY = 20;
+                
+                doc.setFontSize(18);
+                doc.setFont(undefined, 'bold');
+                doc.text("JADWAL RONDA PER TANGGAL", 105, currentY, { align: 'center' });
                 currentY += 10;
-            });
+                
+                // Ambil hanya 30 tanggal terbaru untuk efisiensi
+                const recentDates = dateHeaders.slice(-30).reverse();
+                let datesProcessed = 0;
+                
+                recentDates.forEach((tanggalStr, index) => {
+                    if (currentY > 250) {
+                        if (datesProcessed < recentDates.length) {
+                            doc.addPage();
+                            currentY = 20;
+                        } else {
+                            return;
+                        }
+                    }
+                    
+                    const wargaBertugas = [];
+                    dataRows.forEach(row => {
+                        const namaWarga = row[0];
+                        const colIndex = headers.indexOf(tanggalStr);
+                        if (colIndex > 0) {
+                            const statusRonda = row[colIndex];
+                            const statusStr = statusRonda ? statusRonda.toString().toUpperCase() : '';
+                            
+                            if (statusStr === 'TRUE' || statusStr === 'YA' || statusStr === '1' || statusStr === '✓') {
+                                wargaBertugas.push(namaWarga);
+                            }
+                        }
+                    });
+                    
+                    if (wargaBertugas.length > 0) {
+                        let formattedDate = tanggalStr;
+                        try {
+                            const dateMoment = moment(tanggalStr, ['DD/MM/YYYY', 'DD-MM-YYYY', 'YYYY-MM-DD']);
+                            if (dateMoment.isValid()) {
+                                formattedDate = dateMoment.format('DD MMMM YYYY');
+                            }
+                        } catch (e) {
+                            // Gunakan format asli
+                        }
+                        
+                        doc.setFontSize(11);
+                        doc.setFont(undefined, 'bold');
+                        doc.text(`${formattedDate}:`, margin, currentY);
+                        currentY += 6;
+                        
+                        doc.setFontSize(10);
+                        doc.setFont(undefined, 'normal');
+                        
+                        // Tampilkan maksimal 8 warga per baris
+                        const chunks = [];
+                        for (let i = 0; i < wargaBertugas.length; i += 4) {
+                            chunks.push(wargaBertugas.slice(i, i + 4));
+                        }
+                        
+                        chunks.forEach(chunk => {
+                            const line = chunk.join(', ');
+                            if (currentY < 280) {
+                                doc.text(line, margin + 10, currentY);
+                                currentY += 5;
+                            }
+                        });
+                        
+                        currentY += 3;
+                        datesProcessed++;
+                    }
+                });
+                
+                if (datesProcessed < dateHeaders.length) {
+                    doc.setFontSize(9);
+                    doc.setFont(undefined, 'italic');
+                    doc.text(`...dan ${dateHeaders.length - datesProcessed} tanggal lainnya`, margin, currentY);
+                }
+            }
         }
         
-        // Footer
-        doc.setFontSize(9);
-        doc.setFont(undefined, 'italic');
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Laporan dicetak otomatis oleh Sistem E-MURAI`, 105, 285, { align: 'center' });
-        doc.text(`© System Management Gang Murai ${new Date().getFullYear()}`, 105, 290, { align: 'center' });
+        // Footer semua halaman
+        const totalPages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setFont(undefined, 'italic');
+            doc.setTextColor(150, 150, 150);
+            doc.text(`Halaman ${i} dari ${totalPages}`, 105, 285, { align: 'center' });
+            doc.text(`© System Management Gang Murai ${new Date().getFullYear()}`, 105, 290, { align: 'center' });
+        }
         
-        doc.save(`Laporan_Ronda_EMurai_${moment().format('YYYYMMDD')}.pdf`);
+        doc.save(`Rekap_Ronda_EMurai_${moment().format('YYYYMMDD_HHmm')}.pdf`);
         
     } catch (err) { 
         console.error("Error generating PDF:", err);
