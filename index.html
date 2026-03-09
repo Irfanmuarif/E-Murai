@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>E-MURAI - Sistem Informasi Gang Perumahan</title>
     
-    <!-- External Libraries (CDNs) - Harus tetap di HTML -->
+    <!-- External Libraries (CDNs) -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -19,9 +19,6 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Toast Container -->
-    <div id="toastContainer" class="toast-container"></div>
-
     <div class="app-container">
         <!-- Main App Screen -->
         <div id="mainScreen" class="screen">
@@ -65,7 +62,9 @@
                     <div class="page-header">
                         <h2>Pengumuman</h2>
                     </div>
-                    <div id="pengumumanList" class="card-container"></div>
+                    <div id="pengumumanList" class="card-container">
+                        <!-- Pengumuman items will be loaded here -->
+                    </div>
                 </div>
 
                 <!-- Iuran Bulanan Page -->
@@ -74,7 +73,9 @@
                         <h2>Iuran Bulanan 2026</h2>
                     </div>
                     <div class="table-container">
-                        <table id="iuranTable" class="data-table"></table>
+                        <table id="iuranTable" class="data-table">
+                            <!-- Iuran table will be loaded here -->
+                        </table>
                     </div>
                 </div>
 
@@ -116,7 +117,9 @@
                         </div>
                     </div>
                 
-                    <div id="kasContainer"></div>
+                    <div id="kasContainer">
+                        <!-- Kas data will be loaded here -->
+                    </div>
                 </div>
 
                 <!-- Jadwal Ronda Page -->
@@ -127,7 +130,9 @@
                             <i class="fas fa-file-pdf"></i>Download PDF
                         </button>
                     </div>
-                    <div class="table-container"></div>
+                    <div class="table-container">
+                        <!-- Ronda data will be loaded here -->
+                    </div>
                 </div>
             </main>
         </div>
@@ -138,7 +143,7 @@
         <div class="spinner"></div>
     </div>
 
-    <!-- Link ke JS Eksternal (Ditaruh di paling bawah body) -->
+    <!-- JavaScript Logic -->
     <script src="script.js"></script>
 </body>
 </html>
