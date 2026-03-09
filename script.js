@@ -9,7 +9,7 @@
         // Variabel Penampung Data Global
         let rawKasData = []; 
         let rawRondaData = [];
-        let kasDataForChart = []; // Data untuk chart
+        let kasDataForChart = []; 
 
         // DOM elements
         const refreshBtn = document.getElementById('refreshBtn');
@@ -29,7 +29,7 @@
                 item.addEventListener('click', () => switchPage(item.getAttribute('data-page')));
             });
             loadInitialData();
-            setInterval(refreshAllData, 5 * 60 * 1000); // Auto refresh tiap 5 menit
+            setInterval(refreshAllData, 5 * 60 * 1000); 
         });
 
         function switchPage(pageName) {
@@ -85,14 +85,11 @@
             return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); 
         }
 
-        // Fungsi untuk memformat teks dengan line breaks
         function formatTextWithBreaks(text) {
             if (!text) return '';
-            // Ganti karakter newline dengan <br>
             return text.toString().replace(/\n/g, '<br>');
         }
 
-        // Fungsi untuk memotong teks dengan titik-titik
         function truncateText(text, maxLength = 100) {
             if (!text) return '';
             if (text.length <= maxLength) return text;
@@ -100,7 +97,7 @@
         }
 
         // ---------------------------------------------------------
-        // 1. PENGUMUMAN - DENGAN FITUR EXPAND/COLLAPSE
+        // 1. PENGUMUMAN
         // ---------------------------------------------------------
         function loadPengumuman() {
             fetchAndParseCSV(csvUrls.pengumuman)
@@ -139,13 +136,11 @@
                 .finally(() => showLoading(false));
         }
 
-        // Fungsi untuk toggle pengumuman
         function togglePengumuman(headerElement) {
             const card = headerElement.closest('.pengumuman-card');
             const content = card.querySelector('.pengumuman-content');
             const toggleIcon = headerElement.querySelector('.pengumuman-toggle');
             
-            // Tutup semua pengumuman lainnya
             document.querySelectorAll('.pengumuman-card').forEach(otherCard => {
                 if (otherCard !== card) {
                     const otherContent = otherCard.querySelector('.pengumuman-content');
@@ -158,7 +153,6 @@
                 }
             });
             
-            // Toggle pengumuman ini
             if (content.style.display === 'none') {
                 content.style.display = 'block';
                 toggleIcon.classList.remove('fa-chevron-down');
@@ -204,7 +198,7 @@
         }
 
         // ---------------------------------------------------------
-        // 3. UANG KAS (DASHBOARD & LAPORAN)
+        // 3. UANG KAS
         // ---------------------------------------------------------
         function loadUangKas() {
             fetchAndParseCSV(csvUrls.kas)
@@ -327,7 +321,6 @@
                     </tr>
                 `;
 
-                // --- HEADER ACCORDION (NET BULANAN) ---
                 const netBulan = bulanDataItem.saldoBulan; 
                 const isPlus = netBulan >= 0;
                 const warnaTeks = isPlus ? 'var(--success-color)' : 'var(--danger-color)';
@@ -394,7 +387,6 @@
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF('p', 'mm', 'a4');
                 
-                // Header
                 doc.setFontSize(20);
                 doc.setFont(undefined, 'bold');
                 doc.setTextColor(0, 0, 0);
@@ -424,7 +416,6 @@
                 const totalColumns = 5;
                 const equalColumnWidth = contentWidth / totalColumns - 5;
 
-                // --- BAGIAN 1: PENGUMPULAN DATA UNTUK GRAFIK ---
                 const chartData = {
                     labels: [],
                     pemasukan: [],
@@ -433,14 +424,13 @@
                     net: []
                 };
 
-                let tempGlobalBalance = 0; // Variabel sementara untuk kalkulasi chart
+                let tempGlobalBalance = 0;
 
                 for (const bulan of sortedMonths) {
                     const rows = grouped[bulan];
                     let totalMasuk = 0;
                     let totalKeluar = 0;
                     
-                    // Hitung total per bulan (untuk keperluan chart)
                     for (const r of rows) {
                         const vIn = parseInt(r[4]?.toString().replace(/[^0-9]/g, "")) || 0;
                         const vOut = parseInt(r[5]?.toString().replace(/[^0-9]/g, "")) || 0;
@@ -458,20 +448,16 @@
                     chartData.net.push(netBulan);
                 }
 
-                // --- BAGIAN 2: HAPUS DATA PERTAMA (JANUARI) AGAR MULAI FEBRUARI ---
                 if (chartData.labels.length > 0) {
-                    chartData.labels.shift();      // Hapus Januari
-                    chartData.pemasukan.shift();   // Hapus data Januari
-                    chartData.pengeluaran.shift(); // Hapus data Januari
-                    chartData.saldo.shift();      // Hapus saldo Januari
-                    chartData.net.shift();        // Hapus net Januari
+                    chartData.labels.shift();
+                    chartData.pemasukan.shift();
+                    chartData.pengeluaran.shift();
+                    chartData.saldo.shift();
+                    chartData.net.shift();
                 }
-
-                // --- BAGIAN 3: RENDER TABEL (DATA LENGKAP DARI JANUARI) ---
-                // Kita memindahkan bagian tabel ke atas agar muncul duluan di PDF
                 
-                let globalBalance = 0; // Reset balance untuk perhitungan tabel
-                let currentY = 40; // Mulai posisi Y untuk tabel setelah header
+                let globalBalance = 0; 
+                let currentY = 40; 
 
                 for (const bulan of sortedMonths) {
                     const rows = grouped[bulan];
@@ -494,7 +480,6 @@
                         };
                     });
                     
-                    // Cek page break untuk tabel
                     if (currentY > 220) {
                         doc.addPage();
                         currentY = 20;
@@ -588,13 +573,9 @@
                     currentY += 10;
                 }
 
-                // --- BAGIAN 4: RINGKASAN AKHIR ---
-                // Hitung total ulang untuk summary (agar akurat)
                 const totalPemasukan = chartData.pemasukan.reduce((a, b) => a + b, 0);
                 const totalPengeluaran = chartData.pengeluaran.reduce((a, b) => a + b, 0);
-                // Tambahkan data bulan pertama (Januari) yang dihapus di grafik ke total summary
-                // Agar summary totalnya tetap lengkap
-                const firstMonth = sortedMonths[0]; // Misal Januari
+                const firstMonth = sortedMonths[0]; 
                 const firstMonthRows = grouped[firstMonth] || [];
                 let firstMonthIn = 0, firstMonthOut = 0;
                 firstMonthRows.forEach(r => {
@@ -604,7 +585,7 @@
                 
                 const grandTotalIn = totalPemasukan + firstMonthIn;
                 const grandTotalOut = totalPengeluaran + firstMonthOut;
-                const grandBalance = globalBalance; // globalBalance sudah menghitung semua bulan di loop tabel
+                const grandBalance = globalBalance; 
 
                 if (currentY > 220) {
                     doc.addPage();
@@ -648,12 +629,9 @@
                 doc.text(`Laporan dicetak pada: ${moment().format('DD/MM/YYYY HH:mm')}`, 105, 285, { align: 'center' });
                 doc.text(`© System Management Gang Murai ${new Date().getFullYear()}`, 105, 290, { align: 'center' });
 
-                // --- BAGIAN 5: RENDER GRAFIK DI HALAMAN TERAKHIR ---
-                // Tambah halaman baru agar grafik tidak satu halaman dengan tabel
                 doc.addPage();
-                currentY = 20; // Reset posisi Y ke atas halaman baru
+                currentY = 20; 
 
-                // GRAFIK 1: PEMASUKAN vs PENGELUARAN
                 doc.setFontSize(16);
                 doc.setFont(undefined, 'bold');
                 doc.setTextColor(0, 0, 0);
@@ -698,11 +676,7 @@
                             responsive: false,
                             maintainAspectRatio: false,
                             plugins: {
-                                title: {
-                                    display: true,
-                                    text: 'Trend Pemasukan dan Pengeluaran per Bulan (Mulai Februari 2025)',
-                                    font: { size: 14, color: '#000000' }
-                                },
+                                title: { display: true, text: 'Trend Pemasukan dan Pengeluaran per Bulan (Mulai Februari 2025)', font: { size: 14, color: '#000000' } },
                                 legend: { position: 'top', labels: { font: { size: 10 }, color: '#000000' } }
                             },
                             scales: {
@@ -718,7 +692,6 @@
                     currentY += 90;
                 }
 
-                // GRAFIK 2: SALDO KUMULATIF
                 doc.setFontSize(16);
                 doc.setFont(undefined, 'bold');
                 doc.setTextColor(0, 0, 0);
@@ -752,11 +725,7 @@
                             responsive: false,
                             maintainAspectRatio: false,
                             plugins: {
-                                title: {
-                                    display: true,
-                                    text: 'Perkembangan Saldo Kas (Mulai Februari 2025)',
-                                    font: { size: 14, color: '#000000' }
-                                },
+                                title: { display: true, text: 'Perkembangan Saldo Kas (Mulai Februari 2025)', font: { size: 14, color: '#000000' } },
                                 legend: { position: 'top', labels: { font: { size: 10 }, color: '#000000' } }
                             },
                             scales: {
@@ -772,8 +741,6 @@
                     currentY += 90;
                 }
 
-                // GRAFIK 3: HASIL BERSIH BULANAN
-                // Cek apakah halaman masih muat untuk grafik ke-3, jika tidak buat halaman baru lagi
                 if (currentY > 220) {
                     doc.addPage();
                     currentY = 20;
@@ -813,20 +780,13 @@
                             responsive: false,
                             maintainAspectRatio: false,
                             plugins: {
-                                title: {
-                                    display: true,
-                                    text: 'Analisis Surplus/Defisit (Mulai Februari 2025)',
-                                    font: { size: 14, color: '#000000' }
-                                },
+                                title: { display: true, text: 'Analisis Surplus/Defisit (Mulai Februari 2025)', font: { size: 14, color: '#000000' } },
                                 legend: { position: 'top', labels: { font: { size: 10 }, color: '#000000' } }
                             },
                             scales: {
                                 x: { ticks: { font: { size: 9 }, color: '#000000' }, grid: { display: false } },
                                 y: {
-                                    grid: {
-                                        color: (context) => context.tick.value === 0 ? '#000000' : 'rgba(0, 0, 0, 0.1)',
-                                        lineWidth: (context) => context.tick.value === 0 ? 2 : 1
-                                    },
+                                    grid: { color: (context) => context.tick.value === 0 ? '#000000' : 'rgba(0, 0, 0, 0.1)', lineWidth: (context) => context.tick.value === 0 ? 2 : 1 },
                                     ticks: { font: { size: 9 }, color: '#000000', callback: function(value) { if (value >= 1000000) return 'Rp ' + (value / 1000000).toFixed(1) + 'jt'; else if (value >= 1000) return 'Rp ' + (value / 1000).toFixed(0) + 'k'; return 'Rp ' + value; } }
                                 }
                             }
@@ -839,7 +799,6 @@
                     currentY += 90;
                 }
                 
-                // Cleanup Canvases
                 if (canvas1.parentNode) document.body.removeChild(canvas1);
                 if (canvas2.parentNode) document.body.removeChild(canvas2);
                 if (canvas3.parentNode) document.body.removeChild(canvas3);
@@ -864,42 +823,47 @@
         }
 
         // ---------------------------------------------------------
-        // 4. JADWAL RONDA
+        // 4. JADWAL RONDA (UPDATED LAYOUT)
         // ---------------------------------------------------------
         function loadJadwalRonda() {
             fetchAndParseCSV(csvUrls.ronda)
                 .then(data => {
                     if (data.length <= 1) return;
                     rawRondaData = data;
-
+        
                     const rondaPage = document.getElementById('rondaPage');
                     const tableContainer = rondaPage.querySelector('.table-container');
                     tableContainer.style.overflowX = "hidden";
                     tableContainer.innerHTML = '<div id="rondaVisualList" class="ronda-visual-container"></div>';
                     const listContainer = document.getElementById('rondaVisualList');
-
+        
                     const headers = data[0];
                     const lastRondaIdx = headers.length - 1;
-
+        
                     let rondaList = [];
                     for (let i = 1; i < data.length; i++) {
+                        const namaWarga = data[i][0];
+                        const pathFoto = data[i][1] ? data[i][1].trim() : ''; 
+                        const hariTerakhir = parseInt(data[i][lastRondaIdx]) || 0;
+        
                         rondaList.push({
-                            nama: data[i][0],
-                            hariTerakhir: parseInt(data[i][lastRondaIdx]) || 0
+                            nama: namaWarga,
+                            foto: pathFoto,
+                            hariTerakhir: hariTerakhir
                         });
                     }
-
+        
                     rondaList.sort((a, b) => {
                         if (a.hariTerakhir === 0) return -1;
                         if (b.hariTerakhir === 0) return 1;
                         return b.hariTerakhir - a.hariTerakhir;
                     });
-
+        
                     const maxHari = Math.max(...rondaList.map(item => item.hariTerakhir));
-
+        
                     rondaList.forEach(item => {
                         let persentase, labelTeks, statusClass;
-
+        
                         if (item.hariTerakhir === 0) {
                             persentase = 100;
                             labelTeks = "DIPILIH RONDA";
@@ -909,19 +873,34 @@
                             labelTeks = `Sudah ${item.hariTerakhir} hari tidak ronda`;
                             statusClass = "";
                         }
-
+        
+                        let avatarUrl;
+                        if (item.foto && item.foto !== '') {
+                            avatarUrl = item.foto;
+                        } else {
+                            avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nama)}&background=random&color=fff&size=128&bold=true`;
+                        }
+        
+                        // --- MODIFIED HTML STRUCTURE ---
+                        // Avatar sekarang berada di luar wrapper teks, sejajar dengan bar
                         const itemHtml = `
                             <div class="ronda-item ${statusClass}">
-                                <div class="ronda-info">
-                                    <span class="ronda-name">${item.nama}</span>
-                                    <span class="ronda-days">${item.hariTerakhir === 0 ? 'Aktif Malam Ini' : item.hariTerakhir + ' Hari'}</span>
+                                <!-- Avatar Kiri -->
+                                <img src="${avatarUrl}" alt="${item.nama}" class="ronda-avatar" 
+                                     onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(item.nama)}&background=random&color=fff&size=128';">
+                                
+                                <!-- Konten Kanan (Teks + Bar) -->
+                                <div class="ronda-content-wrapper">
+                                    <div class="ronda-text-info">
+                                        <span class="ronda-name">${item.nama}</span>
+                                        <span class="ronda-days">${item.hariTerakhir === 0 ? 'Aktif Malam Ini' : item.hariTerakhir + ' Hari'}</span>
+                                    </div>
+                                    <div class="ronda-bar-bg">
+                                        <div class="ronda-bar-fill" style="width: ${persentase}%"></div>
+                                        <div class="ronda-bar-text">${labelTeks}</div>
+                                    </div>
                                 </div>
-                                <div class="ronda-bar-bg">
-                                    <div class="ronda-bar-fill" style="width: ${persentase}%"></div>
-                                    <div class="ronda-bar-text">${labelTeks}</div>
-                                </div>
-                            </div>
-                        `;
+                            </div>`;
                         listContainer.insertAdjacentHTML('beforeend', itemHtml);
                     });
                     updateLastUpdateTime();
@@ -936,14 +915,15 @@
             try {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF('p', 'mm', 'a4');
+                const pageWidth = doc.internal.pageSize.width;
                 
                 doc.setFontSize(20);
                 doc.setFont(undefined, 'bold');
-                doc.text("REKAP RONDA 2026", 105, 15, { align: 'center' });
+                doc.text("REKAP RONDA 2026", pageWidth / 2, 15, { align: 'center' });
                 
                 doc.setFontSize(12);
                 doc.setFont(undefined, 'normal');
-                doc.text(`System Management Gang Murai - Dicetak: ${moment().format('DD MMMM YYYY HH:mm')}`, 105, 22, { align: 'center' });
+                doc.text(`System Management Gang Murai - Dicetak: ${moment().format('DD MMMM YYYY HH:mm')}`, pageWidth / 2, 22, { align: 'center' });
                 
                 const headers = rawRondaData[0];
                 const dataRows = rawRondaData.slice(1);
@@ -1074,8 +1054,9 @@
                         grandTotal += row[row.length - 1];
                     });
                     
-                    const margin = 6;
-                    const pageWidth = doc.internal.pageSize.width;
+                    const tableWidth = 170; 
+                    const startX = (pageWidth - tableWidth) / 2; 
+                    
                     const noColWidth = 8;
                     const namaColWidth = 35;
                     const bulanColWidth = 7;
@@ -1110,8 +1091,8 @@
                             }, {}),
                             [tableHeaders.length - 1]: { cellWidth: totalColWidth, halign: 'center', valign: 'middle', fontStyle: 'bold' }
                         },
-                        margin: { left: margin, right: margin },
-                        tableWidth: 'auto',
+                        tableWidth: tableWidth, 
+                        margin: { left: startX, top: 35, bottom: 20 },
                         styles: { overflow: 'linebreak', cellWidth: 'wrap' },
                         didParseCell: function(data) {
                             if (data.row.index >= 0 && data.column.index >= 0) {
@@ -1126,7 +1107,7 @@
                         didDrawPage: function(data) {
                             doc.setFontSize(8);
                             doc.setFont(undefined, 'bold');
-                            doc.text(`Total: ${grandTotal} kali`, pageWidth - 25, 15);
+                            doc.text(`Total: ${grandTotal} kali`, pageWidth - 20, 15, { align: 'right' });
                         }
                     });
                 }
@@ -1138,7 +1119,7 @@
                     
                     doc.setFontSize(18);
                     doc.setFont(undefined, 'bold');
-                    doc.text("JADWAL RONDA PER TANGGAL", 105, currentY, { align: 'center' });
+                    doc.text("JADWAL RONDA PER TANGGAL", pageWidth / 2, currentY, { align: 'center' }); 
                     currentY += 10;
                     
                     doc.setFontSize(11);
@@ -1155,7 +1136,7 @@
                             currentY = 20;
                             doc.setFontSize(16);
                             doc.setFont(undefined, 'bold');
-                            doc.text(`JADWAL RONDA PER TANGGAL (lanjutan)`, 105, currentY, { align: 'center' });
+                            doc.text(`JADWAL RONDA PER TANGGAL (lanjutan)`, pageWidth / 2, currentY, { align: 'center' });
                             currentY += 10;
                         }
                         
@@ -1225,8 +1206,8 @@
                     doc.setFontSize(7);
                     doc.setFont(undefined, 'italic');
                     doc.setTextColor(150, 150, 150);
-                    doc.text(`Halaman ${i} dari ${totalPages}`, 105, 285, { align: 'center' });
-                    doc.text(`© System Management Gang Murai ${new Date().getFullYear()}`, 105, 290, { align: 'center' });
+                    doc.text(`Halaman ${i} dari ${totalPages}`, pageWidth / 2, 285, { align: 'center' }); 
+                    doc.text(`© System Management Gang Murai ${new Date().getFullYear()}`, pageWidth / 2, 290, { align: 'center' }); 
                 }
                 
                 doc.save(`Rekap_Ronda_EMurai_${moment().format('YYYYMMDD_HHmm')}.pdf`);
