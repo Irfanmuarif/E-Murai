@@ -800,6 +800,7 @@ function loadJadwalRonda() {
         .then(data => {
             if (data.length <= 1) return;
             rawRondaData = data;
+
             const rondaPage = document.getElementById('rondaPage');
             const tableContainer = rondaPage.querySelector('.table-container');
             tableContainer.style.overflowX = "hidden";
@@ -827,6 +828,7 @@ function loadJadwalRonda() {
 
             rondaList.forEach(item => {
                 let persentase, labelTeks, statusClass;
+
                 if (item.hariTerakhir === 0) {
                     persentase = 100;
                     labelTeks = "DIPILIH RONDA";
@@ -847,7 +849,8 @@ function loadJadwalRonda() {
                             <div class="ronda-bar-fill" style="width: ${persentase}%"></div>
                             <div class="ronda-bar-text">${labelTeks}</div>
                         </div>
-                    </div>`;
+                    </div>
+                `;
                 listContainer.insertAdjacentHTML('beforeend', itemHtml);
             });
             updateLastUpdateTime();
