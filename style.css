@@ -1,4 +1,4 @@
-        :root {
+    :root {
             /* Color Scheme - Modern Professional */
             --primary-color: #4361ee;
             --primary-light: #6d8bf5;
@@ -868,4 +868,31 @@
             .content { padding: 0; padding-bottom: 0; }
             .card, .stat-card, .month-accordion { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
             .month-accordion.active .accordion-content { max-height: none; }
+        }
+
+        /* Styling Alert Melayang untuk Iuran Belum Input */
+          /* Update warna ke Biru */
+        @keyframes pulseBlue {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.01); box-shadow: 0 0 10px rgba(0, 123, 255, 0.2); }
+            100% { transform: scale(1); }
+        }
+        
+        .alert-iuran-info {
+            background: #e7f3ff; /* Background biru muda */
+            color: #004085;      /* Teks biru tua */
+            padding: 10px; 
+            border-radius: 8px; 
+            border-left: 5px solid #007bff; /* Border samping biru */
+            margin-bottom: 15px; 
+            font-size: 0.85rem; 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            animation: pulseBlue 2s infinite;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .alert-floating-header i {
+            font-size: 0.9rem;
         }
