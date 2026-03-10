@@ -216,9 +216,10 @@
                 kasContainer.innerHTML = '<p class="text-center">Data kas tidak ditemukan.</p>';
                 return;
             }
-
+        
             const bulanData = {};
             
+            // Looping data dari sheet
             for (let i = 1; i < data.length; i++) {
                 const row = data[i];
                 if (!row[1]) continue;
@@ -230,7 +231,7 @@
                 const transaksi = {
                     bulan: row[1],
                     tgl: row[2],
-                    ket: row[3],
+                    ket: row[3] || '',
                     masuk,
                     keluar,
                     saldoTransaksi
@@ -296,9 +297,26 @@
                 saldoSebelum += bulanData[bulanKey].saldoBulan;
             }
             
+            // Render HTML (Reverse agar bulan terbaru di atas)
             bulanDenganSaldoKumulatif.reverse().forEach((bulanDataItem, idx) => {
                 let saldoBerjalan = saldoSebelumBulan[bulanDataItem.namaBulan];
                 
+            // --- Bagian Logic Alert Biru ---
+                    const isIuranInputted = bulanDataItem.transaksi.some(t => 
+                        t.masuk > 0 && t.ket.toLowerCase().includes('iuran bulanan blok')
+                    );
+            
+                    let alertHtml = '';
+                    if (!isIuranInputted) {
+                        alertHtml = `
+                            <div class="alert-iuran-info">
+                                <i class="fas fa-info-circle"></i>
+                                <span>iuran bulan <strong>${bulanDataItem.namaBulan}</strong> sementara belum diinput, masih ada yang belum melakukan pembayaran, cek di menu iuran bulanan</span>
+                            </div>
+                        `;
+                    }
+                    // ------------------------------
+        
                 const rowsHtml = bulanDataItem.transaksi.map(item => {
                     saldoBerjalan += (item.masuk - item.keluar);
                     
@@ -320,12 +338,12 @@
                         <td class="font-weight-bold text-right saldo-kumulatif">Rp ${formatNumber(bulanDataItem.saldoKumulatif)}</td>
                     </tr>
                 `;
-
+        
                 const netBulan = bulanDataItem.saldoBulan; 
                 const isPlus = netBulan >= 0;
                 const warnaTeks = isPlus ? 'var(--success-color)' : 'var(--danger-color)';
                 const tanda = isPlus ? '+' : '-';
-
+        
                 const accDiv = document.createElement('div');
                 accDiv.className = `month-accordion ${idx === 0 ? 'active' : ''}`;
                 
@@ -343,6 +361,7 @@
                         </div>
                     </div>
                     <div class="accordion-content">
+                        ${alertHtml}
                         <div class="table-container">
                             <table class="data-table">
                                 <thead>
@@ -361,7 +380,7 @@
                             </table>
                         </div>
                     </div>`;
-
+        
                 kasContainer.appendChild(accDiv);
             });
         }
@@ -1220,3 +1239,4 @@
                 showLoading(false); 
             }
         }
+    </script>
