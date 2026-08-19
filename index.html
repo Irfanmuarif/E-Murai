@@ -6,7 +6,7 @@
     <title>E-MURAI - Sistem Informasi Gang Perumahan</title>
     
     <!-- External Libraries (CDNs) -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -16,7 +16,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 
     <!-- Link ke CSS Eksternal -->
-    <link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="style.css">
 
 </head>
 <body>
@@ -54,6 +54,10 @@
                 <button class="nav-item" data-page="ronda">
                     <i class="fas fa-shield-alt"></i>
                     <span>Jadwal Ronda</span>
+                </button>
+                <button class="nav-item" data-page="lainnya">
+                    <i class="fas fa-ellipsis-h"></i>
+                    <span>Lainnya</span>
                 </button>
             </nav>
 
@@ -135,7 +139,31 @@
                         <!-- Ronda data will be loaded here -->
                     </div>
                 </div>
+
+                <!-- Lainnya Page -->
+                <div id="lainnyaPage" class="page">
+                    <div class="page-header">
+                        <h2 id="lainnyaTitle">Data Lainnya</h2>
+                    </div>
+                    <div class="table-container">
+                        <table id="lainnyaTable" class="data-table">
+                            <!-- Lainnya table will be loaded here -->
+                        </table>
+                    </div>
+                </div>
             </main>
+        </div>
+    </div>
+
+    <!-- PDF-like Modal for Pengumuman -->
+    <div id="pdfModal" class="pdf-modal">
+        <div class="pdf-paper">
+            <button class="close-modal" onclick="closePdfModal()">
+                <i class="fas fa-times"></i>
+            </button>
+            <div id="pdfBody">
+                <!-- Content injected via JS -->
+            </div>
         </div>
     </div>
 
@@ -143,9 +171,9 @@
     <div id="loadingIndicator" class="loading-indicator hidden">
         <div class="spinner"></div>
     </div>
-
+    
     <!-- JavaScript Logic -->
     <script src="script.js"></script>
-    
+
 </body>
 </html>
