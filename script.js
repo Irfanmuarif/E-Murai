@@ -3,7 +3,8 @@
             pengumuman: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRhtHQT_YmSq-tiQt-6Kqj5Ms9oeUdTdiNIChEdQPgEQryYxTMf2M5RTgpVa1oi30rvvXrJK3XY4nyd/pub?gid=0&single=true&output=csv',
             iuran: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRhtHQT_YmSq-tiQt-6Kqj5Ms9oeUdTdiNIChEdQPgEQryYxTMf2M5RTgpVa1oi30rvvXrJK3XY4nyd/pub?gid=1650144415&single=true&output=csv',
             kas: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRhtHQT_YmSq-tiQt-6Kqj5Ms9oeUdTdiNIChEdQPgEQryYxTMf2M5RTgpVa1oi30rvvXrJK3XY4nyd/pub?gid=2139823991&single=true&output=csv',
-            ronda: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRhtHQT_YmSq-tiQt-6Kqj5Ms9oeUdTdiNIChEdQPgEQryYxTMf2M5RTgpVa1oi30rvvXrJK3XY4nyd/pub?gid=2068778061&single=true&output=csv'
+            ronda: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRhtHQT_YmSq-tiQt-6Kqj5Ms9oeUdTdiNIChEdQPgEQryYxTMf2M5RTgpVa1oi30rvvXrJK3XY4nyd/pub?gid=2068778061&single=true&output=csv',
+            lainnya: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRhtHQT_YmSq-tiQt-6Kqj5Ms9oeUdTdiNIChEdQPgEQryYxTMf2M5RTgpVa1oi30rvvXrJK3XY4nyd/pub?gid=769255665&single=true&output=csv'
         };
 
         // Variabel Penampung Data Global
@@ -22,11 +23,19 @@
         const pengumumanList = document.getElementById('pengumumanList');
         const iuranTable = document.getElementById('iuranTable');
         const kasContainer = document.getElementById('kasContainer');
+        const pdfModal = document.getElementById('pdfModal');
+        const pdfBody = document.getElementById('pdfBody');
+        const lainnyaTable = document.getElementById('lainnyaTable');
+        const lainnyaTitle = document.getElementById('lainnyaTitle');
 
         document.addEventListener('DOMContentLoaded', () => {
             refreshBtn.addEventListener('click', refreshAllData);
             navItems.forEach(item => {
                 item.addEventListener('click', () => switchPage(item.getAttribute('data-page')));
+            });
+            // Close modal when clicking outside paper
+            pdfModal.addEventListener('click', (e) => {
+                if(e.target === pdfModal) closePdfModal();
             });
             loadInitialData();
             setInterval(refreshAllData, 5 * 60 * 1000); 
@@ -57,6 +66,7 @@
                 case 'iuran': loadIuranBulanan(); break;
                 case 'kas': loadUangKas(); break;
                 case 'ronda': loadJadwalRonda(); break;
+                case 'lainnya': loadLainnya(); break;
             }
         }
 
@@ -85,11 +95,6 @@
             return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); 
         }
 
-        function formatTextWithBreaks(text) {
-            if (!text) return '';
-            return text.toString().replace(/\n/g, '<br>');
-        }
-
         function truncateText(text, maxLength = 100) {
             if (!text) return '';
             if (text.length <= maxLength) return text;
@@ -97,7 +102,7 @@
         }
 
         // ---------------------------------------------------------
-        // 1. PENGUMUMAN
+        // 1. PENGUMUMAN (UPDATED MODAL & SPACING)
         // ---------------------------------------------------------
         function loadPengumuman() {
             fetchAndParseCSV(csvUrls.pengumuman)
@@ -108,26 +113,34 @@
                         return; 
                     }
                     
-                    for (let i = 1; i < data.length; i++) {
-                        const [id, tgl, judul, isi, pengirim] = data[i];
-                        const isiFormatted = formatTextWithBreaks(isi);
-                        const isiTruncated = truncateText(isi, 150);
+                    // Loop backwards to show newest first
+                    for (let i = data.length - 1; i >= 1; i--) {
+                        const row = data[i];
+                        const [id, tgl, judul, isi, pengirim] = row;
+                        
+                        // Simple strip tags for preview if needed, but here just raw text
+                        const preview = truncateText(isi, 120);
                         
                         const card = document.createElement('div');
                         card.className = 'card pengumuman-card';
+                        
+                        // Click event directly on card to open modal
+                        card.onclick = () => openPdfModal(judul, tgl, isi, pengirim);
+
                         card.innerHTML = `
-                            <div class="card-header pengumuman-header" onclick="togglePengumuman(this)">
+                            <div class="card-header pengumuman-header">
                                 <div class="pengumuman-header-content">
                                     <h3 class="card-title">${judul || 'Tanpa Judul'}</h3>
-                                    <span class="card-date">${moment(tgl).format('DD/MM/YY')}</span>
+                                    <span class="card-date">${moment(tgl).format('DD MMMM YYYY')}</span>
                                 </div>
-                                <i class="fas fa-chevron-down pengumuman-toggle"></i>
+                                <i class="fas fa-external-link-alt pengumuman-toggle"></i>
                             </div>
-                            <div class="card-content pengumuman-content" style="display: none;">
-                                <div class="pengumuman-isi">${isiFormatted}</div>
+                            <div class="card-content">
+                                ${preview}
                             </div>
                             <div class="card-footer">
                                 <span>Oleh: ${pengirim || 'Admin'}</span>
+                                <span class="text-primary">Baca Selengkapnya</span>
                             </div>`;
                         pengumumanList.appendChild(card);
                     }
@@ -136,32 +149,52 @@
                 .finally(() => showLoading(false));
         }
 
-        function togglePengumuman(headerElement) {
-            const card = headerElement.closest('.pengumuman-card');
-            const content = card.querySelector('.pengumuman-content');
-            const toggleIcon = headerElement.querySelector('.pengumuman-toggle');
+        // Fungsi untuk memformat teks agar "Enter" terlihat sebagai paragraf
+        function formatTextToParagraphs(text) {
+            if (!text) return '<p>Konten kosong.</p>';
             
-            document.querySelectorAll('.pengumuman-card').forEach(otherCard => {
-                if (otherCard !== card) {
-                    const otherContent = otherCard.querySelector('.pengumuman-content');
-                    const otherIcon = otherCard.querySelector('.pengumuman-toggle');
-                    if (otherContent) otherContent.style.display = 'none';
-                    if (otherIcon) {
-                        otherIcon.classList.remove('fa-chevron-up');
-                        otherIcon.classList.add('fa-chevron-down');
-                    }
-                }
-            });
+            // 1. Ganti double newline (\n\n) dengan penanda paragraf baru
+            // 2. Ganti single newline (\n) dengan <br> untuk soft break dalam paragraf
+            // 3. Bungkus semuanya dalam tag <p>
             
-            if (content.style.display === 'none') {
-                content.style.display = 'block';
-                toggleIcon.classList.remove('fa-chevron-down');
-                toggleIcon.classList.add('fa-chevron-up');
-            } else {
-                content.style.display = 'none';
-                toggleIcon.classList.remove('fa-chevron-up');
-                toggleIcon.classList.add('fa-chevron-down');
-            }
+            const paragraphs = text.split(/\n\s*\n/); // Pisahkan berdasarkan baris kosong
+            return paragraphs.map(para => {
+                // Hapus spasi berlebih di awal/akhir paragraf
+                const cleanPara = para.trim();
+                if(!cleanPara) return '';
+                // Ganti sisa \n dengan <br> untuk baris baru dalam paragraf yang sama
+                const formattedPara = cleanPara.replace(/\n/g, '<br>');
+                return `<p>${formattedPara}</p>`;
+            }).join('');
+        }
+
+        function openPdfModal(judul, tgl, isi, pengirim) {
+            const formattedContent = formatTextToParagraphs(isi);
+            
+            const html = `
+                <div class="pdf-header">
+                    <div class="pdf-title">${judul || 'Pengumuman'}</div>
+                    <div class="pdf-meta">
+                        <span><i class="far fa-calendar-alt"></i> ${moment(tgl).format('dddd, DD MMMM YYYY')}</span>
+                        <span><i class="far fa-user"></i> ${pengirim || 'Admin'}</span>
+                    </div>
+                </div>
+                <div class="pdf-content">
+                    ${formattedContent}
+                </div>
+                <div class="pdf-footer">
+                    <small>Generated by E-MURAI System</small>
+                </div>
+            `;
+            
+            pdfBody.innerHTML = html;
+            pdfModal.classList.add('active');
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        }
+
+        function closePdfModal() {
+            pdfModal.classList.remove('active');
+            document.body.style.overflow = ''; // Restore scrolling
         }
 
         // ---------------------------------------------------------
@@ -219,7 +252,6 @@
         
             const bulanData = {};
             
-            // Looping data dari sheet
             for (let i = 1; i < data.length; i++) {
                 const row = data[i];
                 if (!row[1]) continue;
@@ -297,25 +329,22 @@
                 saldoSebelum += bulanData[bulanKey].saldoBulan;
             }
             
-            // Render HTML (Reverse agar bulan terbaru di atas)
             bulanDenganSaldoKumulatif.reverse().forEach((bulanDataItem, idx) => {
                 let saldoBerjalan = saldoSebelumBulan[bulanDataItem.namaBulan];
                 
-            // --- Bagian Logic Alert Biru ---
-                    const isIuranInputted = bulanDataItem.transaksi.some(t => 
-                        t.masuk > 0 && t.ket.toLowerCase().includes('iuran bulanan blok')
-                    );
+                const isIuranInputted = bulanDataItem.transaksi.some(t => 
+                    t.masuk > 0 && t.ket.toLowerCase().includes('iuran bulanan blok')
+                );
             
-                    let alertHtml = '';
-                    if (!isIuranInputted) {
-                        alertHtml = `
-                            <div class="alert-iuran-info">
-                                <i class="fas fa-info-circle"></i>
-                                <span>iuran bulan <strong>${bulanDataItem.namaBulan}</strong> sementara belum diinput, masih ada yang belum melakukan pembayaran, cek di menu iuran bulanan</span>
-                            </div>
-                        `;
-                    }
-                    // ------------------------------
+                let alertHtml = '';
+                if (!isIuranInputted) {
+                    alertHtml = `
+                        <div class="alert-iuran-info">
+                            <i class="fas fa-info-circle"></i>
+                            <span>iuran bulan <strong>${bulanDataItem.namaBulan}</strong> sementara belum diinput, masih ada yang belum melakukan pembayaran, cek di menu iuran bulanan</span>
+                        </div>
+                    `;
+                }
         
                 const rowsHtml = bulanDataItem.transaksi.map(item => {
                     saldoBerjalan += (item.masuk - item.keluar);
@@ -842,7 +871,7 @@
         }
 
         // ---------------------------------------------------------
-        // 4. JADWAL RONDA (UPDATED LAYOUT)
+        // 4. JADWAL RONDA
         // ---------------------------------------------------------
         function loadJadwalRonda() {
             fetchAndParseCSV(csvUrls.ronda)
@@ -900,15 +929,10 @@
                             avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nama)}&background=random&color=fff&size=128&bold=true`;
                         }
         
-                        // --- MODIFIED HTML STRUCTURE ---
-                        // Avatar sekarang berada di luar wrapper teks, sejajar dengan bar
                         const itemHtml = `
                             <div class="ronda-item ${statusClass}">
-                                <!-- Avatar Kiri -->
                                 <img src="${avatarUrl}" alt="${item.nama}" class="ronda-avatar" 
                                      onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(item.nama)}&background=random&color=fff&size=128';">
-                                
-                                <!-- Konten Kanan (Teks + Bar) -->
                                 <div class="ronda-content-wrapper">
                                     <div class="ronda-text-info">
                                         <span class="ronda-name">${item.nama}</span>
@@ -1238,4 +1262,62 @@
             finally { 
                 showLoading(false); 
             }
+        }
+
+        // ---------------------------------------------------------
+        // 5. LAINNYA (Menu Baru)
+        // ---------------------------------------------------------
+        function loadLainnya() {
+            fetchAndParseCSV(csvUrls.lainnya)
+                .then(data => {
+                    if (data.length === 0) {
+                        lainnyaTitle.innerText = "Data Tidak Ditemukan";
+                        lainnyaTable.innerHTML = '';
+                        return;
+                    }
+
+                    // Baris pertama adalah Judul
+                    const title = data[0][0] || "Data Lainnya";
+                    lainnyaTitle.innerText = title;
+
+                    // Jika tidak ada header atau data
+                    if (data.length < 2) {
+                        lainnyaTable.innerHTML = '<tbody><tr><td class="text-center">Tidak ada data tabel.</td></tr></tbody>';
+                        return;
+                    }
+
+                    // Baris kedua adalah Header Tabel
+                    const headers = data[1];
+                    let html = `<thead><tr>`;
+                    
+                    // Kita hanya ambil 2 kolom sesuai permintaan (Nama Warga dan Checkbox)
+                    html += `<th>${headers[0] || 'Nama Warga'}</th>`;
+                    html += `<th class="text-center">${headers[1] || 'Status'}</th>`;
+                    html += `</tr></thead><tbody>`;
+                    
+                    // Baris ketiga dan seterusnya adalah Isi Data
+                    for (let i = 2; i < data.length; i++) {
+                        if (!data[i] || !data[i][0]) continue; // Skip baris kosong
+                        
+                        html += '<tr>';
+                        // Kolom 1: Nama Warga
+                        html += `<td>${data[i][0] || '-'}</td>`;
+                        
+                        // Kolom 2: Checkbox (Ceklis)
+                        const val = (data[i][1] || "").toString().trim().toUpperCase();
+                        const isChecked = val === 'TRUE' || val === 'YA' || val === '1' || val === 'V' || val === 'X' || val === '✓';
+                        
+                        html += `<td class="text-center">
+                            <div class="checkbox-container">
+                                <input type="checkbox" ${isChecked ? 'checked' : ''} disabled>
+                            </div>
+                        </td>`;
+                        
+                        html += '</tr>';
+                    }
+                    
+                    lainnyaTable.innerHTML = html + '</tbody>';
+                    updateLastUpdateTime();
+                })
+                .finally(() => showLoading(false));
         }
