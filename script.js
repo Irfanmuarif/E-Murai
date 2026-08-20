@@ -459,7 +459,7 @@
                 const sortedMonths = Object.keys(grouped).sort((a, b) => urutanBulan[a] - urutanBulan[b]);
 
                 const pageWidth = doc.internal.pageSize.width;
-                const margin = 20;
+                const margin = 10;
                 const contentWidth = pageWidth - (2 * margin);
                 const totalColumns = 5;
                 const equalColumnWidth = contentWidth / totalColumns - 5;
@@ -512,22 +512,45 @@
                     let totalMasuk = 0;
                     let totalKeluar = 0;
                     
-                    const rowData = rows.map(r => {
+                    // 1. SORTING: Pemasukan di atas, Pengeluaran di bawah
+                    const sortedRows = rows.slice().sort((a, b) => {
+                        const vInA = parseInt(a[4]?.toString().replace(/[^0-9]/g, "")) || 0;
+                        const vOutA = parseInt(a[5]?.toString().replace(/[^0-9]/g, "")) || 0;
+                        const vInB = parseInt(b[4]?.toString().replace(/[^0-9]/g, "")) || 0;
+                        const vOutB = parseInt(b[5]?.toString().replace(/[^0-9]/g, "")) || 0;
+                        
+                        if (vInA > 0 && vOutB > 0) return -1; // A Pemasukan, B Pengeluaran -> A duluan
+                        if (vInB > 0 && vOutA > 0) return 1;  // B Pemasukan, A Pengeluaran -> B duluan
+                        return 0; 
+                    });
+
+                    // 2. MEMBUAT DATA TABEL sekaligus menghitung Saldo Kumulatif
+                    const tableData = sortedRows.map(r => {
                         const vIn = parseInt(r[4]?.toString().replace(/[^0-9]/g, "")) || 0;
                         const vOut = parseInt(r[5]?.toString().replace(/[^0-9]/g, "")) || 0;
                         totalMasuk += vIn;
                         totalKeluar += vOut;
                         const saldoSebelum = globalBalance;
                         globalBalance += (vIn - vOut);
-                        return {
-                            tgl: r[2],
-                            ket: r[3],
-                            masuk: vIn,
-                            keluar: vOut,
-                            saldo: saldoSebelum + (vIn - vOut)
-                        };
+                        
+                        return [
+                            r[2], // Tanggal
+                            r[3], // Keterangan
+                            vIn > 0 ? formatNumber(vIn) : '-',
+                            vOut > 0 ? formatNumber(vOut) : '-',
+                            formatNumber(saldoSebelum + (vIn - vOut))
+                        ];
                     });
                     
+                    tableData.push([
+                        '',
+                        `TOTAL ${bulan.toUpperCase()}:`,
+                        totalMasuk > 0 ? formatNumber(totalMasuk) : '-',
+                        totalKeluar > 0 ? formatNumber(totalKeluar) : '-',
+                        formatNumber(globalBalance)
+                    ]);
+
+                    // 3. PENGATURAN HALAMAN & CETAK JUDUL BULAN (YANG HILANG TADI)
                     if (currentY > 220) {
                         doc.addPage();
                         currentY = 20;
@@ -536,76 +559,59 @@
                     doc.setFontSize(14);
                     doc.setFont(undefined, 'bold');
                     doc.setTextColor(0, 0, 0);
-                    doc.text(`Rincian Bulan: ${bulan}`, margin, currentY);
-                    currentY += 8;
-                    
-                    const tableData = rowData.map(r => [
-                        r.tgl,
-                        r.ket,
-                        formatNumber(r.masuk),
-                        formatNumber(r.keluar),
-                        formatNumber(r.saldo)
-                    ]);
-                    
-                    tableData.push([
-                        '',
-                        `TOTAL ${bulan.toUpperCase()}:`,
-                        formatNumber(totalMasuk),
-                        formatNumber(totalKeluar),
-                        formatNumber(globalBalance)
-                    ]);
+                    doc.text(`Rincian Bulan: ${bulan}`, margin, currentY, { baseline: 'top' });
+                    currentY += 6; // Beri jarak 10mm agar tabel nempel tepat di bawah judul
                     
                     doc.autoTable({
                         startY: currentY,
-                        head: [['Tanggal', 'Keterangan', 'Masuk', 'Keluar', 'Saldo Kumulatif']],
+                        head: [['TANGGAL', 'KETERANGAN', 'MASUK', 'KELUAR', 'SALDO AKHIR']],
                         body: tableData,
                         theme: 'grid',
+                        styles: { 
+                            fontSize: 12,    // <--- 1. UKURAN FONT ISI TABEL
+                            cellPadding: 2,    // <--- 2. TINGGI BARIS ISI
+                            overflow: 'linebreak',
+                            lineColor: [0, 0, 0],     // 1. UBAH GARIS TABEL JADI HITAM PEKIT
+                            lineWidth: 0.1,           // Ketebalan garis
+                            textColor: [0, 0, 0]       // 4. UBAH FONT ISI JADI HITAM
+                        },
                         headStyles: { 
-                            fillColor: [67, 97, 238], 
-                            fontSize: 9,
-                            textColor: [255, 255, 255],
+                            fillColor: [67, 97, 238], // 3. UBAH FILL HEADER
+                            fontSize: 12,    // <--- 1. UKURAN FONT HEADER TABEL
+                            textColor: [255, 255, 255], // WARNA FONT HEADER JADI PUTIH
                             halign: 'center',
-                            fontStyle: 'bold'
+                            fontStyle: 'bold',
+                            cellPadding: 2            // <--- 4. TINGGI BARIS HEADER
                         },
                         bodyStyles: { 
-                            fontSize: 8,
-                            cellPadding: 3,
-                            overflow: 'linebreak',
-                            textColor: [0, 0, 0],
-                            fontStyle: 'normal'
+                            fillColor: [255, 255, 255] // 3. FILL ISI TABEL JADI PUTIH
                         },
                         columnStyles: {
-                            0: { cellWidth: equalColumnWidth, halign: 'center', minCellWidth: equalColumnWidth - 2, textColor: [0, 0, 0] },
-                            1: { cellWidth: equalColumnWidth + 10, minCellWidth: equalColumnWidth, textColor: [0, 0, 0] },
-                            2: { cellWidth: equalColumnWidth, halign: 'right', minCellWidth: equalColumnWidth - 2, textColor: [0, 0, 0] },
-                            3: { cellWidth: equalColumnWidth, halign: 'right', minCellWidth: equalColumnWidth - 2, textColor: [0, 0, 0] },
-                            4: { cellWidth: equalColumnWidth, halign: 'right', minCellWidth: equalColumnWidth - 2, textColor: [0, 0, 0] }
+                            // 0 = Tanggal, 1 = Keterangan, 2 = Masuk, 3 = Keluar, 4 = Saldo
+                            0: { cellWidth: 27, halign: 'center' }, // Kolom Tanggal (20mm)
+                            1: { cellWidth: 70, halign: 'left' },   // Kolom Keterangan (60mm - dibuat lebih lebar)
+                            2: { cellWidth: 29, halign: 'right' },  // Kolom Masuk (35mm)
+                            3: { cellWidth: 29, halign: 'right' },  // Kolom Keluar (35mm)
+                            4: { cellWidth: 35, halign: 'right' }   // Kolom Saldo (40mm)
+                            // Total = 190mm (Pas dengan lebar kertas)
                         },
                         margin: { left: margin, right: margin },
                         willDrawCell: function(data) {
+                            // 3. UBAH FILL WARNA BARIS TOTAL (PALING BAWAH)
                             if (data.row.index === tableData.length - 1) {
-                                doc.setFillColor(230, 255, 247);
+                                doc.setFillColor(36, 191, 49); // Warna Hijau transparan
                                 doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, 'F');
-                                doc.setDrawColor(6, 214, 160);
-                                doc.setLineWidth(0.5);
-                                doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
-                                doc.setFont(undefined, 'bold');
-                                doc.setTextColor(0, 0, 0);
-                                if (data.column.index === 4) {
-                                    doc.setFillColor(200, 250, 237);
-                                    doc.roundedRect(data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2, 2, 2, 'F');
-                                }
-                            } else {
-                                doc.setTextColor(0, 0, 0);
                             }
                         },
                         didParseCell: function(data) {
+                            // 4. UBAH FONT BARIS TOTAL JADI HITAM DAN TEBAL
                             if (data.row.index === tableData.length - 1) {
-                                data.cell.styles.textColor = [0, 0, 0];
+                                data.cell.styles.textColor = [255, 255, 255];
                                 data.cell.styles.fontStyle = 'bold';
-                            } else {
-                                data.cell.styles.textColor = [0, 0, 0];
+                                data.cell.styles.fontSize = 12;      // <--- 5. UKURAN FONT BARIS TOTAL (Bagian Bawah)
+                                data.cell.styles.cellPadding = 2;   // <--- 6. TINGGI BARIS TOTAL (Bagian Bawah)
                             }
+                            // Potong tanggal jika terlalu panjang
                             if (data.column.index === 0 && data.cell.raw) {
                                 if (data.cell.raw.length > 10) {
                                     data.cell.text = data.cell.raw.substring(0, 10);
@@ -645,7 +651,7 @@
                 doc.setFont(undefined, 'bold');
                 doc.setTextColor(0, 0, 0);
                 doc.text("RINGKASAN KESELURUHAN", margin, currentY);
-                currentY += 8;
+                currentY += 5;
                 
                 doc.setFont(undefined, 'normal');
                 doc.setFontSize(10);
