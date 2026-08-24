@@ -15,11 +15,44 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 
-    <!-- Link ke CSS Eksternal -->
+ 	<!-- Link ke CSS Eksternal -->
 	<link rel="stylesheet" href="style.css">
-
+	
 </head>
 <body>
+
+    <!-- COUNTDOWN POPUP HTML -->
+    <div id="countdownPopup" class="countdown-overlay">
+        <div class="countdown-box">
+            <button id="closeCountdownBtn" class="countdown-close-btn">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="countdown-icon">
+                <img src="images/abdul.jpeg" alt="Korlap" class="countdown-img">
+            </div>
+            <h3 class="countdown-title">Menuju Pergantian Korlap bapak ABDUL</h3>
+            <p class="countdown-subtitle">Tanggal 1 Oktober 2026</p>
+            <div class="countdown-timer">
+                <div class="time-unit">
+                    <span id="cdDays" class="time-num">0</span>
+                    <span class="time-label">Hari</span>
+                </div>
+                <div class="time-unit">
+                    <span id="cdHours" class="time-num">0</span>
+                    <span class="time-label">Jam</span>
+                </div>
+                <div class="time-unit">
+                    <span id="cdMins" class="time-num">0</span>
+                    <span class="time-label">Menit</span>
+                </div>
+                <div class="time-unit">
+                    <span id="cdSecs" class="time-num">0</span>
+                    <span class="time-label">Detik</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="app-container">
         <!-- Main App Screen -->
         <div id="mainScreen" class="screen">
@@ -171,9 +204,9 @@
     <div id="loadingIndicator" class="loading-indicator hidden">
         <div class="spinner"></div>
     </div>
-    
-    <!-- JavaScript Logic -->
-    <script src="script.js"></script>
 
+	<!-- JavaScript Logic -->
+    <script src="script.js"></script>
+ 
 </body>
 </html>
