@@ -965,8 +965,9 @@
         }
         .countdown-close-btn:hover { color: var(--danger-color); }
         .countdown-icon {
-            width: 90px; /* Diperbesar sedikit untuk gambar */
+            width: 90px; 
             height: 90px;
+            flex-shrink: 0; /* TAMBAHKAN INI: Mencegah gambar memaksa memperbesar kotak di HP */
             background: linear-gradient(135deg, rgba(67, 97, 238, 0.1) 0%, rgba(114, 9, 183, 0.1) 100%);
             border-radius: 50%;
             display: flex;
@@ -979,7 +980,10 @@
         .countdown-img {
             width: 100%;
             height: 100%;
+            max-width: 90px; /* TAMBAHKAN INI: Batas maksimal agar tidak membengkak */
+            max-height: 90px; /* TAMBAHKAN INI: Batas maksimal agar tidak membengkak */
             object-fit: cover;
+            display: block; /* TAMBAHKAN INI: Menghilangkan ghost space di HTML */
         }
         .countdown-title {
             font-size: 1.2rem;
