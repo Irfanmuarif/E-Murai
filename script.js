@@ -28,6 +28,53 @@
         const lainnyaTable = document.getElementById('lainnyaTable');
         const lainnyaTitle = document.getElementById('lainnyaTitle');
 
+        // ==========================================
+        // COUNTDOWN POPUP LOGIC
+        // ==========================================
+        const countdownPopup = document.getElementById('countdownPopup');
+        const closeCountdownBtn = document.getElementById('closeCountdownBtn');
+
+        // Show popup when app opens (with slight delay)
+        setTimeout(() => {
+            countdownPopup.classList.add('active');
+        }, 800);
+
+        // Close popup event
+        closeCountdownBtn.addEventListener('click', () => {
+            countdownPopup.classList.remove('active');
+        });
+
+        // Countdown Target: 1 Oktober 2026, 00:00:00
+        const targetDate = new Date("2026-10-01T00:00:00").getTime();
+
+        function updateCountdown() {
+            const now = new Date().getTime();
+            const distance = targetDate - now;
+
+            if (distance < 0) {
+                document.getElementById('cdDays').innerText = "0";
+                document.getElementById('cdHours').innerText = "0";
+                document.getElementById('cdMins').innerText = "0";
+                document.getElementById('cdSecs').innerText = "0";
+                return;
+            }
+
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            document.getElementById('cdDays').innerText = days;
+            document.getElementById('cdHours').innerText = hours;
+            document.getElementById('cdMins').innerText = minutes;
+            document.getElementById('cdSecs').innerText = seconds;
+        }
+
+        // Run countdown every 1 second
+        setInterval(updateCountdown, 1000);
+        updateCountdown(); // initial call
+        // ==========================================
+
         document.addEventListener('DOMContentLoaded', () => {
             refreshBtn.addEventListener('click', refreshAllData);
             navItems.forEach(item => {
